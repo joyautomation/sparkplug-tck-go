@@ -426,10 +426,11 @@ func (c *collector) close() {
 // DBIRTH, bdSeq UNCHANGED per spec — no new CONNECT happened), then
 // DDEATH + NDEATH on clean disconnect. ReceiveCommandTest needs the
 // rebirth response to PASS rebirth-action-1/2.
-func driveCompliantEdge(broker, _, group, edge, device string) {
+func driveCompliantEdge(broker, host, group, edge, device string) {
 	clientID := "tck-correctness-edge-" + edge
 	willTopic := fmt.Sprintf("spBv1.0/%s/NDEATH/%s", group, edge)
 	ncmdTopic := fmt.Sprintf("spBv1.0/%s/NCMD/%s", group, edge)
+	stateTopic := fmt.Sprintf("spBv1.0/STATE/%s", host)
 
 	bdSeq := uint64(0)
 	willPayload := bdSeqPayload(bdSeq)
@@ -493,9 +494,15 @@ func driveCompliantEdge(broker, _, group, edge, device string) {
 	}
 	defer c.Disconnect(200)
 
-	// Subscribe NCMD/DCMD before publishing births.
+	// Subscribe NCMD/DCMD before publishing births. Also subscribe to the
+	// Primary Host STATE topic — SessionEstablishmentTest's phid-wait check
+	// (ID_MESSAGE_FLOW_EDGE_NODE_BIRTH_PUBLISH_PHID_WAIT) only PASSes if the
+	// SUT is observed subscribing to spBv1.0/STATE/<hostId> before NBIRTH.
 	c.Subscribe(ncmdTopic, 1, nil).WaitTimeout(2 * time.Second)
 	c.Subscribe(fmt.Sprintf("spBv1.0/%s/DCMD/%s/%s", group, edge, device), 1, nil).WaitTimeout(2 * time.Second)
+	if host != "" {
+		c.Subscribe(stateTopic, 1, nil).WaitTimeout(2 * time.Second)
+	}
 
 	now := time.Now().UnixMilli()
 
@@ -773,10 +780,13 @@ func driveCompliantHost(broker, host string) {
 			return
 		}
 		// Respond to the TCK's offline provocation with a fresh BIRTH.
+		// Spec: BIRTH timestamp MUST equal the immediately prior CONNECT
+		// Will Message timestamp. We didn't reconnect, so reuse birthTS
+		// rather than time.Now() — Java's setResultIfNotFail would otherwise
+		// flip host-topic-phid-birth-payload-timestamp to FAIL on this
+		// second BIRTH and never recover.
 		responded = true
-		ts := time.Now().UnixMilli()
-		body, _ := json.Marshal(map[string]any{"online": true, "timestamp": ts})
-		client.Publish(stateTopic, 1, true, body)
+		client.Publish(stateTopic, 1, true, birthBody)
 	}
 
 	opts := mqtt.NewClientOptions().
