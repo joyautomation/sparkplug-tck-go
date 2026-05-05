@@ -48,8 +48,16 @@ go build ./cmd/sparkplug-tck-bench ./cmd/sparkplug-tck-diff
 ./sparkplug-tck-diff -java java.json -go go.json
 ```
 
-The diff reports agreement % across IDs both engines emitted a verdict
-for. As of writing, `edge SessionEstablishmentTest` reaches **95.7%
-agreement** (67/70 IDs) — disagreements indicate either a Go scenario
-that's too lenient or an upstream test that's stricter than the spec
-text itself.
+The diff splits per-ID outcomes into three buckets:
+
+- **Logic agreement** — both engines PASSed or both FAILed the same ID.
+  This is the headline metric. As of writing, all 11 upstream tests
+  reach **100.0% logic agreement** (243/243 IDs both sides graded).
+- **Logic conflict** — one engine PASS, the other FAIL. A real
+  disagreement that needs investigation.
+- **Coverage Δ** — one side emitted NE while the other graded. Reflects
+  the structural mismatch between Java's per-test scoping (some IDs are
+  NOT_EXECUTED for tests that don't exercise them) and Go's per-profile
+  scoping (one verdict per ID across all scenarios in a profile). Not a
+  logic conflict — flagged separately so it doesn't drag the agreement
+  number down.

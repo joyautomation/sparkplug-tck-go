@@ -58,6 +58,13 @@ type row struct {
 	Java  string
 	Go    string
 	Agree bool
+	// Kind classifies the row beyond simple agreement:
+	//   "match"    - both sides emitted the same PASS/FAIL/NE verdict
+	//   "conflict" - both sides graded but disagree (PASS vs FAIL)
+	//   "coverage" - one side is NE while the other is PASS/FAIL
+	//                (no logic conflict, just an asymmetric coverage gap)
+	//   "java-only", "go-only" - only one side emitted any verdict
+	Kind string
 }
 
 func main() {
@@ -90,8 +97,8 @@ func main() {
 		rows := buildRows(jr, gr)
 		t := count(rows)
 		fmt.Fprintf(os.Stderr,
-			"%s — agree:%d disagree:%d (java only:%d, go only:%d) — agreement %.1f%%\n",
-			jr.Test, t.agree, t.disagree, t.javaOnly, t.goOnly,
+			"%s — agree:%d conflict:%d coverage:%d (java only:%d, go only:%d) — logic agreement %.1f%%\n",
+			jr.Test, t.agree, t.disagree, t.coverage, t.javaOnly, t.goOnly,
 			percent(t.agree, t.agree+t.disagree))
 	}
 }
@@ -158,7 +165,26 @@ func buildRows(jr javaReport, gr goReport) []row {
 	for id := range all {
 		j := java[id]
 		g := goVerdicts[id]
-		rows = append(rows, row{ID: id, Java: j, Go: g, Agree: j != "" && g != "" && j == g})
+		r := row{ID: id, Java: j, Go: g, Agree: j != "" && g != "" && j == g}
+		switch {
+		case j == "" && g == "":
+			// shouldn't happen — id came from one map or the other
+		case j == "":
+			r.Kind = "go-only"
+		case g == "":
+			r.Kind = "java-only"
+		case j == g:
+			r.Kind = "match"
+		case j == "NOT_EXECUTED" || g == "NOT_EXECUTED":
+			// One side declined to grade; not a logic conflict, just a
+			// coverage gap. Java grades per-test (NE = "this test didn't
+			// have signal for this rule"); Go grades per-profile, so it
+			// can PASS/FAIL rules that Java's specific test punted on.
+			r.Kind = "coverage"
+		default:
+			r.Kind = "conflict"
+		}
+		rows = append(rows, r)
 	}
 	return rows
 }
@@ -187,22 +213,24 @@ func normalizeStatus(s string) string {
 }
 
 type totals struct {
-	agree, disagree, javaOnly, goOnly, bothEmpty int
+	agree, disagree, coverage, javaOnly, goOnly, bothEmpty int
 }
 
 func count(rows []row) totals {
 	var t totals
 	for _, r := range rows {
-		switch {
-		case r.Java == "" && r.Go == "":
+		switch r.Kind {
+		case "":
 			t.bothEmpty++
-		case r.Java != "" && r.Go == "":
+		case "java-only":
 			t.javaOnly++
-		case r.Java == "" && r.Go != "":
+		case "go-only":
 			t.goOnly++
-		case r.Agree:
+		case "match":
 			t.agree++
-		default:
+		case "coverage":
+			t.coverage++
+		case "conflict":
 			t.disagree++
 		}
 	}
@@ -219,23 +247,26 @@ func percent(num, denom int) float64 {
 func emitMarkdownMulti(javaTests []javaReport, gr goReport) {
 	fmt.Println("# Sparkplug TCK correctness diff")
 	fmt.Println()
-	fmt.Println("Per-ID verdicts where both engines emitted a result for the same upstream test class. \"Agree\" counts only IDs both sides scored.")
+	fmt.Println("Per-ID verdicts where both engines emitted a result for the same upstream test class.")
 	fmt.Println()
-	fmt.Println("| Test | Both | Agree | Disagree | Agreement | Java-only | Go-only |")
-	fmt.Println("| --- | --- | --- | --- | --- | --- | --- |")
-	var totalAgree, totalDisagree int
+	fmt.Println("\"Logic agreement\" counts only IDs where both sides PASSed or both FAILed. Coverage rows (one side NE while the other graded) reflect Java's per-test scoping vs Go's per-profile scoping — not a logic conflict.")
+	fmt.Println()
+	fmt.Println("| Test | Logic Both | Agree | Conflict | Logic Agreement | Coverage Δ | Java-only | Go-only |")
+	fmt.Println("| --- | --- | --- | --- | --- | --- | --- | --- |")
+	var totalAgree, totalDisagree, totalCoverage int
 	for _, jr := range javaTests {
 		rows := buildRows(jr, gr)
 		t := count(rows)
 		totalAgree += t.agree
 		totalDisagree += t.disagree
-		fmt.Printf("| %s | %d | %d | %d | %.1f%% | %d | %d |\n",
+		totalCoverage += t.coverage
+		fmt.Printf("| %s | %d | %d | %d | %.1f%% | %d | %d | %d |\n",
 			jr.Test, t.agree+t.disagree, t.agree, t.disagree,
-			percent(t.agree, t.agree+t.disagree), t.javaOnly, t.goOnly)
+			percent(t.agree, t.agree+t.disagree), t.coverage, t.javaOnly, t.goOnly)
 	}
-	fmt.Printf("| **all** | **%d** | **%d** | **%d** | **%.1f%%** | — | — |\n",
+	fmt.Printf("| **all** | **%d** | **%d** | **%d** | **%.1f%%** | **%d** | — | — |\n",
 		totalAgree+totalDisagree, totalAgree, totalDisagree,
-		percent(totalAgree, totalAgree+totalDisagree))
+		percent(totalAgree, totalAgree+totalDisagree), totalCoverage)
 	fmt.Println()
 	emitPerfSection(javaTests, gr)
 	for _, jr := range javaTests {
@@ -292,19 +323,16 @@ func emitPerfSection(javaTests []javaReport, gr goReport) {
 func emitTestSection(jr javaReport, rows []row) {
 	fmt.Printf("## %s\n\n", jr.Test)
 	fmt.Printf("Java overall: `%s`\n\n", jr.Overall)
-	// Only render disagreements + Java-only — they're the actionable rows.
+	// Only render conflicts + coverage gaps + java-only — actionable rows.
 	var actionable []row
 	for _, r := range rows {
-		if r.Agree {
+		if r.Kind == "match" || r.Kind == "go-only" {
 			continue
-		}
-		if r.Java == "" {
-			continue // Go-only: scenario covers something Java doesn't track here, fine.
 		}
 		actionable = append(actionable, r)
 	}
 	if len(actionable) == 0 {
-		fmt.Println("_No disagreements or Java-only IDs._")
+		fmt.Println("_No conflicts, coverage gaps, or Java-only IDs._")
 		fmt.Println()
 		return
 	}
@@ -316,8 +344,13 @@ func emitTestSection(jr javaReport, rows []row) {
 		if g == "" {
 			g = "—"
 		}
-		note := "disagree"
-		if r.Go == "" {
+		var note string
+		switch r.Kind {
+		case "conflict":
+			note = "logic conflict"
+		case "coverage":
+			note = "coverage delta (one side NE)"
+		case "java-only":
 			note = "java-only (Go harness has no scenario)"
 		}
 		fmt.Printf("| %s | %s | %s | %s |\n", r.ID, j, g, note)
@@ -331,9 +364,10 @@ func emitJSONMulti(javaTests []javaReport, gr goReport) {
 		Overall   string `json:"overall"`
 		Agree     int    `json:"agree"`
 		Disagree  int    `json:"disagree"`
+		Coverage  int    `json:"coverage"`
 		JavaOnly  int    `json:"java_only"`
 		GoOnly    int    `json:"go_only"`
-		Agreement string `json:"agreement_pct"`
+		Agreement string `json:"logic_agreement_pct"`
 		Rows      []row  `json:"rows"`
 	}
 	type combined struct {
@@ -341,7 +375,8 @@ func emitJSONMulti(javaTests []javaReport, gr goReport) {
 		Overall struct {
 			Agree     int    `json:"agree"`
 			Disagree  int    `json:"disagree"`
-			Agreement string `json:"agreement_pct"`
+			Coverage  int    `json:"coverage"`
+			Agreement string `json:"logic_agreement_pct"`
 		} `json:"overall"`
 	}
 	var c combined
@@ -351,13 +386,14 @@ func emitJSONMulti(javaTests []javaReport, gr goReport) {
 		t := count(rows)
 		c.Tests = append(c.Tests, perTest{
 			Test: jr.Test, Overall: jr.Overall,
-			Agree: t.agree, Disagree: t.disagree,
+			Agree: t.agree, Disagree: t.disagree, Coverage: t.coverage,
 			JavaOnly: t.javaOnly, GoOnly: t.goOnly,
 			Agreement: fmt.Sprintf("%.1f", percent(t.agree, t.agree+t.disagree)),
 			Rows:      rows,
 		})
 		c.Overall.Agree += t.agree
 		c.Overall.Disagree += t.disagree
+		c.Overall.Coverage += t.coverage
 	}
 	c.Overall.Agreement = fmt.Sprintf("%.1f", percent(c.Overall.Agree, c.Overall.Agree+c.Overall.Disagree))
 	enc := json.NewEncoder(os.Stdout)
