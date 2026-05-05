@@ -12,6 +12,7 @@ import (
 // Helpers --------------------------------------------------------------
 
 func u64(v uint64) *uint64 { return &v }
+func u32(v uint32) *uint32 { return &v }
 func str(v string) *string { return &v }
 
 func bdSeqMetric(v uint64) *spbpb.Payload_Metric {
@@ -21,13 +22,24 @@ func bdSeqMetric(v uint64) *spbpb.Payload_Metric {
 	}
 }
 
+// stdRebirthMetric is the well-formed Node Control/Rebirth metric every
+// NBIRTH must carry. Tests that don't care about rebirth get it for free
+// via the nbirth helper; rebirth-specific tests build their own.
+func stdRebirthMetric() *spbpb.Payload_Metric {
+	return &spbpb.Payload_Metric{
+		Name:     str(rebirthMetricName),
+		Datatype: u32(uint32(spbpb.DataType_Boolean)),
+		Value:    &spbpb.Payload_Metric_BooleanValue{BooleanValue: false},
+	}
+}
+
 func nbirth(group, n string, seq uint64, ts uint64, bdSeq uint64, qos byte, retain bool) spb.Message {
 	return spb.Message{
 		Topic: spb.Topic{Namespace: spb.Namespace, EdgeNodeID: spb.EdgeNodeID{Group: group, Node: n}, Type: spb.NBIRTH},
 		Payload: &spbpb.Payload{
 			Seq:       u64(seq),
 			Timestamp: u64(ts),
-			Metrics:   []*spbpb.Payload_Metric{bdSeqMetric(bdSeq)},
+			Metrics:   []*spbpb.Payload_Metric{bdSeqMetric(bdSeq), stdRebirthMetric()},
 		},
 		QoS:      qos,
 		Retained: retain,

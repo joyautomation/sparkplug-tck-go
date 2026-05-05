@@ -6,7 +6,7 @@ The official TCK is a Java/HiveMQ stack: ~10s JVM warmup, heavyweight to run as 
 
 ## Status
 
-Early but executable. Assertion catalog is extracted; the runner, session tracker, MQTT capture, and 26 of 274 assertions are wired. The CLI runs against either a JSON fixture or a live MQTT broker.
+Early but executable. Assertion catalog is extracted; the runner, session tracker, MQTT capture, and 46 of 274 assertions are wired. The CLI runs against either a JSON fixture or a live MQTT broker.
 
 ## Parity strategy
 
@@ -96,7 +96,37 @@ tck-id-payloads-ndata-order
 tck-id-payloads-ddata-order
 ```
 
-26 of 274. Many of the remaining assertions reduce to additional
+Host STATE (3.x JSON envelope, retain rules, topic shape — chapter 4 + 5 IDs):
+```
+tck-id-host-topic-phid-birth-qos
+tck-id-host-topic-phid-birth-retain
+tck-id-host-topic-phid-birth-payload
+tck-id-host-topic-phid-birth-topic
+tck-id-host-topic-phid-death-qos
+tck-id-host-topic-phid-death-retain
+tck-id-host-topic-phid-death-payload
+tck-id-host-topic-phid-death-topic
+tck-id-operational-behavior-host-application-connect-birth-qos
+tck-id-operational-behavior-host-application-connect-birth-retained
+tck-id-operational-behavior-host-application-connect-birth-payload
+tck-id-operational-behavior-host-application-connect-birth-topic
+tck-id-operational-behavior-host-application-connect-will-qos
+tck-id-operational-behavior-host-application-connect-will-retained
+tck-id-operational-behavior-host-application-connect-will-payload
+tck-id-operational-behavior-host-application-connect-will-topic
+tck-id-operational-behavior-host-application-death-payload
+tck-id-message-flow-phid-sparkplug-state-publish-payload
+```
+
+Rebirth metric on NBIRTH (Node Control/Rebirth must be Boolean, false, no alias):
+```
+tck-id-operational-behavior-data-commands-rebirth-name
+tck-id-operational-behavior-data-commands-rebirth-value
+tck-id-operational-behavior-data-commands-rebirth-datatype
+tck-id-operational-behavior-data-commands-rebirth-name-aliases
+```
+
+46 of 274. Many of the remaining assertions reduce to additional
 `messageRule` entries (see `internal/assertions/message_rules.go`).
 
 ## Regenerating the catalog
@@ -117,9 +147,9 @@ Set `SPARKPLUG_SPEC_REF` to pin a tag instead of `master`.
 - [x] Fixture-driven CLI for offline runs
 - [x] MQTT harness — live capture against a broker (paho client)
 - [x] Second batch: DBIRTH/NDATA/DDATA/DDEATH envelope + ordering (17)
+- [x] Third batch: host STATE envelope/topic + rebirth metric (20)
 - [ ] Remaining payload-level checks (~80 mechanical)
-- [ ] Sequencing checks: rebirth, STATE, alias rules
-- [ ] Host STATE assertions (3.x JSON shape, retain rules)
+- [ ] Alias rules + sequencing checks not yet covered
 - [ ] Edge-node profile parity with HiveMQ TCK
 - [ ] Host-application profile parity
 - [ ] CI: scheduled spec-drift detection
