@@ -55,11 +55,13 @@ var stateDeathIDs = struct {
 	qos: []string{
 		"tck-id-host-topic-phid-death-qos",
 		"tck-id-operational-behavior-host-application-connect-will-qos",
+		"tck-id-operational-behavior-host-application-death-qos",
 		"tck-id-payloads-state-will-message-qos",
 	},
 	retain: []string{
 		"tck-id-host-topic-phid-death-retain",
 		"tck-id-operational-behavior-host-application-connect-will-retained",
+		"tck-id-operational-behavior-host-application-death-retained",
 		"tck-id-payloads-state-will-message-retain",
 	},
 	payload: []string{
@@ -99,7 +101,8 @@ func registerStateTopic() {
 	const id2 = "tck-id-host-topic-phid-death-topic"
 	const id3 = "tck-id-operational-behavior-host-application-connect-birth-topic"
 	const id4 = "tck-id-operational-behavior-host-application-connect-will-topic"
-	for _, id := range []string{id, id2, id3, id4} {
+	const id5 = "tck-id-operational-behavior-host-application-death-topic"
+	for _, id := range []string{id, id2, id3, id4, id5} {
 		id := id
 		runner.Register(runner.Assertion{ID: id, Run: func(c *runner.Capture) []runner.Result {
 			return stateTopicShape(c, id)

@@ -22,6 +22,58 @@ func init() {
 	registerTopicStructureAliases()
 	registerMessageFlowEdgeAliases()
 	registerMessageFlowDeviceAliases()
+	registerCommandAliases()
+}
+
+// registerCommandAliases wires chapter-4 [tck-id-topics-{n,d}cmd-*] and
+// chapter-5 [tck-id-operational-behavior-data-commands-{n,d}cmd-verb] IDs.
+// Chapter 4's tck-id-topics-*-mqtt restates the QoS/retain rules; -payload,
+// -timestamp, -topic restate that the message exists with the right shape
+// (already enforced by ParseTopic + DecodePayload + the chapter-6 rules).
+func registerCommandAliases() {
+	// NCMD aliases.
+	runner.Register(runner.Assertion{
+		ID:  "tck-id-topics-ncmd-mqtt",
+		Run: messagePresenceAlias(spb.NCMD, "tck-id-topics-ncmd-mqtt"),
+	})
+	runner.Register(runner.Assertion{
+		ID:  "tck-id-topics-ncmd-payload",
+		Run: messagePresenceAlias(spb.NCMD, "tck-id-topics-ncmd-payload"),
+	})
+	runner.Register(runner.Assertion{
+		ID:  "tck-id-topics-ncmd-timestamp",
+		Run: messageHasTimestampAlias(spb.NCMD, "tck-id-topics-ncmd-timestamp"),
+	})
+	runner.Register(runner.Assertion{
+		ID:  "tck-id-topics-ncmd-topic",
+		Run: messagePresenceAlias(spb.NCMD, "tck-id-topics-ncmd-topic"),
+	})
+	runner.Register(runner.Assertion{
+		ID:  "tck-id-operational-behavior-data-commands-ncmd-verb",
+		Run: messagePresenceAlias(spb.NCMD, "tck-id-operational-behavior-data-commands-ncmd-verb"),
+	})
+
+	// DCMD aliases.
+	runner.Register(runner.Assertion{
+		ID:  "tck-id-topics-dcmd-mqtt",
+		Run: messagePresenceAlias(spb.DCMD, "tck-id-topics-dcmd-mqtt"),
+	})
+	runner.Register(runner.Assertion{
+		ID:  "tck-id-topics-dcmd-payload",
+		Run: messagePresenceAlias(spb.DCMD, "tck-id-topics-dcmd-payload"),
+	})
+	runner.Register(runner.Assertion{
+		ID:  "tck-id-topics-dcmd-timestamp",
+		Run: messageHasTimestampAlias(spb.DCMD, "tck-id-topics-dcmd-timestamp"),
+	})
+	runner.Register(runner.Assertion{
+		ID:  "tck-id-topics-dcmd-topic",
+		Run: messagePresenceAlias(spb.DCMD, "tck-id-topics-dcmd-topic"),
+	})
+	runner.Register(runner.Assertion{
+		ID:  "tck-id-operational-behavior-data-commands-dcmd-verb",
+		Run: messagePresenceAlias(spb.DCMD, "tck-id-operational-behavior-data-commands-dcmd-verb"),
+	})
 }
 
 func registerTopicStructureAliases() {
@@ -205,5 +257,11 @@ func messageRetainAlias(mt spb.MessageType, want bool, id string) runner.Asserti
 func messageHasSeqAlias(mt spb.MessageType, id string) runner.AssertionFn {
 	return func(c *runner.Capture) []runner.Result {
 		return runMessageRule(c, messageRule{id: id, mt: mt, pred: mustHaveSeq})
+	}
+}
+
+func messageHasTimestampAlias(mt spb.MessageType, id string) runner.AssertionFn {
+	return func(c *runner.Capture) []runner.Result {
+		return runMessageRule(c, messageRule{id: id, mt: mt, pred: mustHaveTimestamp})
 	}
 }

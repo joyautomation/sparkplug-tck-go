@@ -181,7 +181,20 @@ tck-id-operational-behavior-data-commands-rebirth-datatype
 tck-id-operational-behavior-data-commands-rebirth-name-aliases
 ```
 
-100 of 274. Many of the remaining assertions reduce to additional
+NCMD / DCMD envelope (QoS=0, retain=false, no seq, timestamp present) plus
+chapter-4 topic-* and chapter-5 verb aliases, plus host-application-death
+QoS/retain/topic aliases:
+```
+tck-id-payloads-ncmd-{qos,retain,seq,timestamp}
+tck-id-payloads-dcmd-{qos,retain,seq,timestamp}
+tck-id-topics-ncmd-{mqtt,payload,timestamp,topic}
+tck-id-topics-dcmd-{mqtt,payload,timestamp,topic}
+tck-id-operational-behavior-data-commands-ncmd-verb
+tck-id-operational-behavior-data-commands-dcmd-verb
+tck-id-operational-behavior-host-application-death-{qos,retained,topic}
+```
+
+123 of 274. Many of the remaining assertions reduce to additional
 `messageRule` entries (see `internal/assertions/message_rules.go`).
 
 ## Regenerating the catalog

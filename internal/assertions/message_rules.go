@@ -54,6 +54,16 @@ func mustHaveSeq(m spb.Message) (bool, string) {
 	return true, ""
 }
 
+// mustNotHaveSeq implements "<msg> MUST NOT include a sequence number".
+// NCMD/DCMD are command messages from the host and don't participate in
+// edge-node sequence numbering.
+func mustNotHaveSeq(m spb.Message) (bool, string) {
+	if m.Payload != nil && m.Payload.Seq != nil {
+		return false, fmt.Sprintf("payload includes seq=%d, must be absent", *m.Payload.Seq)
+	}
+	return true, ""
+}
+
 // mustHaveTimestamp implements every "<msg> MUST include a payload timestamp".
 func mustHaveTimestamp(m spb.Message) (bool, string) {
 	if m.Payload == nil || m.Payload.Timestamp == nil {
@@ -117,6 +127,18 @@ var messageRules = []messageRule{
 	// DDEATH: must carry seq + timestamp (unlike NDEATH which has neither).
 	{id: "tck-id-payloads-ddeath-seq", mt: spb.DDEATH, pred: mustHaveSeq},
 	{id: "tck-id-payloads-ddeath-timestamp", mt: spb.DDEATH, pred: mustHaveTimestamp},
+
+	// NCMD: host->edge command. QoS=0, retain=false, timestamp present, no seq.
+	{id: "tck-id-payloads-ncmd-qos", mt: spb.NCMD, pred: mustQoS0},
+	{id: "tck-id-payloads-ncmd-retain", mt: spb.NCMD, pred: mustRetainFalse},
+	{id: "tck-id-payloads-ncmd-seq", mt: spb.NCMD, pred: mustNotHaveSeq},
+	{id: "tck-id-payloads-ncmd-timestamp", mt: spb.NCMD, pred: mustHaveTimestamp},
+
+	// DCMD: host->device command. Same envelope as NCMD.
+	{id: "tck-id-payloads-dcmd-qos", mt: spb.DCMD, pred: mustQoS0},
+	{id: "tck-id-payloads-dcmd-retain", mt: spb.DCMD, pred: mustRetainFalse},
+	{id: "tck-id-payloads-dcmd-seq", mt: spb.DCMD, pred: mustNotHaveSeq},
+	{id: "tck-id-payloads-dcmd-timestamp", mt: spb.DCMD, pred: mustHaveTimestamp},
 
 	// NDEATH is registered as the MQTT Will Message (chapter 6 §3.2.1):
 	// QoS=1, retain=false. We observe the Will when the broker delivers it,
