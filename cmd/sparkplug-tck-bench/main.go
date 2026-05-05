@@ -30,17 +30,36 @@ type catalogEntry struct {
 }
 
 type report struct {
-	CatalogTotal int            `json:"catalog_total"`
-	PassiveIDs   int            `json:"passive_ids"`
-	HarnessIDs   int            `json:"harness_ids"`
-	UnionIDs     int            `json:"union_ids"`
-	UncoveredIDs []string       `json:"uncovered_ids"`
-	HarnessOnly  []string       `json:"harness_only_ids"`
-	ProfileTimes map[string]int `json:"profile_times_ms"`
+	CatalogTotal int                  `json:"catalog_total"`
+	PassiveIDs   int                  `json:"passive_ids"`
+	HarnessIDs   int                  `json:"harness_ids"`
+	UnionIDs     int                  `json:"union_ids"`
+	UncoveredIDs []string             `json:"uncovered_ids"`
+	HarnessOnly  []string             `json:"harness_only_ids"`
+	ProfileTimes map[string]int       `json:"profile_times_ms"`
+	Upstream     []upstreamTestParity `json:"upstream_tests,omitempty"`
+}
+
+// upstreamTest is the on-disk shape of one upstream-tck inventory entry
+// (see upstream_tests.json — produced by scripts/update-upstream-inventory.sh).
+type upstreamTest struct {
+	File string   `json:"file"` // e.g. "edge/SessionEstablishmentTest.java"
+	IDs  []string `json:"ids"`  // tck-id-* the test class asserts on
+}
+
+// upstreamTestParity is one row in the per-upstream-test parity table.
+// "Harness covered" means at least one of our harness scenarios emits a
+// result for that ID — passive coverage is reported in aggregate.
+type upstreamTestParity struct {
+	File         string   `json:"file"`
+	IDs          int      `json:"ids"`
+	HarnessHit   int      `json:"harness_hit"`
+	HarnessMiss  []string `json:"harness_miss,omitempty"`
 }
 
 func main() {
 	catalog := flag.String("catalog", "assertions.json", "path to spec assertion catalog")
+	upstreamPath := flag.String("upstream", "upstream_tests.json", "path to upstream TCK inventory (produced by scripts/update-upstream-inventory.sh)")
 	jsonOut := flag.Bool("json", false, "emit JSON report instead of Markdown")
 	flag.Parse()
 
@@ -76,6 +95,12 @@ func main() {
 	uncovered := diffSorted(catIDs, union)
 	harnessOnly := diffSorted(harnessIDs, passiveIDs)
 
+	upstream, err := loadUpstream(*upstreamPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "load upstream: %v (continuing without per-test parity)\n", err)
+	}
+	upstreamRows := upstreamParity(upstream, harnessIDs)
+
 	rep := report{
 		CatalogTotal: len(cat),
 		PassiveIDs:   countCovered(catIDs, passiveIDs),
@@ -84,6 +109,7 @@ func main() {
 		UncoveredIDs: uncovered,
 		HarnessOnly:  harnessOnly,
 		ProfileTimes: profileTimes,
+		Upstream:     upstreamRows,
 	}
 
 	if *jsonOut {
@@ -128,6 +154,37 @@ func drive(profile string, b *harness.Broker) {
 	case "host-application":
 		driveHost(b)
 	}
+}
+
+func loadUpstream(path string) ([]upstreamTest, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var ts []upstreamTest
+	if err := json.Unmarshal(raw, &ts); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
+	return ts, nil
+}
+
+func upstreamParity(tests []upstreamTest, harness map[string]bool) []upstreamTestParity {
+	out := make([]upstreamTestParity, 0, len(tests))
+	for _, t := range tests {
+		hit := 0
+		var miss []string
+		for _, id := range t.IDs {
+			if harness[id] {
+				hit++
+			} else {
+				miss = append(miss, id)
+			}
+		}
+		out = append(out, upstreamTestParity{
+			File: t.File, IDs: len(t.IDs), HarnessHit: hit, HarnessMiss: miss,
+		})
+	}
+	return out
 }
 
 func loadCatalog(path string) ([]catalogEntry, error) {
@@ -194,6 +251,24 @@ func printMarkdown(w *os.File, r report) {
 		}
 		fmt.Fprintln(w)
 	}
+	if len(r.Upstream) > 0 {
+		fmt.Fprintln(w, "## Per-upstream-test parity")
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "Each row is one upstream Eclipse-TCK test class. \"Harness\" counts how many of its assertion IDs our harness scenarios emit a result for.")
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "| Upstream test | IDs | Harness covered |")
+		fmt.Fprintln(w, "|---------------|-----|-----------------|")
+		var totalIDs, totalHit int
+		for _, u := range r.Upstream {
+			fmt.Fprintf(w, "| %s | %d | %d (%.0f%%) |\n",
+				u.File, u.IDs, u.HarnessHit, percent(u.HarnessHit, u.IDs))
+			totalIDs += u.IDs
+			totalHit += u.HarnessHit
+		}
+		fmt.Fprintf(w, "| **Total (unique IDs may be lower)** | **%d** | **%d (%.0f%%)** |\n",
+			totalIDs, totalHit, percent(totalHit, totalIDs))
+		fmt.Fprintln(w)
+	}
 	if len(r.HarnessOnly) > 0 {
 		fmt.Fprintln(w, "## Harness-only IDs")
 		fmt.Fprintln(w)
@@ -215,4 +290,20 @@ func printMarkdown(w *os.File, r report) {
 	fmt.Fprintf(os.Stderr, "parity: %s union (%d/%d), %d harness-only, %d uncovered\n",
 		pct(r.UnionIDs), r.UnionIDs, r.CatalogTotal,
 		len(r.HarnessOnly), len(r.UncoveredIDs))
+	if len(r.Upstream) > 0 {
+		var ids, hit int
+		for _, u := range r.Upstream {
+			ids += u.IDs
+			hit += u.HarnessHit
+		}
+		fmt.Fprintf(os.Stderr, "upstream-test parity: %.1f%% (%d/%d test-asserted IDs covered by harness)\n",
+			percent(hit, ids), hit, ids)
+	}
+}
+
+func percent(n, d int) float64 {
+	if d == 0 {
+		return 0
+	}
+	return 100 * float64(n) / float64(d)
 }
