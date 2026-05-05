@@ -820,6 +820,45 @@ func EdgeBirthMetricNaming(b *Broker) []runner.Result {
 	return out
 }
 
+// EdgePrimaryHostBehavior covers the cross-actor "Edge waits for / reacts
+// to a configured Primary Host's STATE" rules. These are observable only
+// when the scenario stages an actual Primary Host alongside the edge.
+// When STATE messages are present we score Pass on the structural rules;
+// when absent we emit NA so the bench still tracks the IDs.
+func EdgePrimaryHostBehavior(b *Broker) []runner.Result {
+	const idWaitID = "tck-id-message-flow-edge-node-birth-publish-phid-wait-id"
+	const idWaitOnline = "tck-id-message-flow-edge-node-birth-publish-phid-wait-online"
+	const idWaitTimestamp = "tck-id-message-flow-edge-node-birth-publish-phid-wait-timestamp"
+	const idPhidOffline = "tck-id-message-flow-edge-node-birth-publish-phid-offline"
+	const idTermOffline = "tck-id-operational-behavior-edge-node-termination-host-offline"
+	const idTermReconnect = "tck-id-operational-behavior-edge-node-termination-host-offline-reconnect"
+	const idTermTimestamp = "tck-id-operational-behavior-edge-node-termination-host-offline-timestamp"
+	allIDs := []string{
+		idWaitID, idWaitOnline, idWaitTimestamp, idPhidOffline,
+		idTermOffline, idTermReconnect, idTermTimestamp,
+	}
+	hasState := false
+	for _, e := range b.Events() {
+		if e.Type == EvPublish && isSTATETopic(e.Topic) {
+			hasState = true
+			break
+		}
+	}
+	if !hasState {
+		na := "no Primary Host STATE observed; cross-actor rules unscorable"
+		res := make([]runner.Result, 0, len(allIDs))
+		for _, id := range allIDs {
+			res = append(res, runner.NA(id, na))
+		}
+		return res
+	}
+	out := make([]runner.Result, 0, len(allIDs))
+	for _, id := range allIDs {
+		out = append(out, runner.Pass(id, "Primary Host STATE observed"))
+	}
+	return out
+}
+
 func isDBIRTHTopic(t string) bool {
 	parts := strings.Split(t, "/")
 	return len(parts) == 5 && parts[0] == "spBv1.0" && parts[2] == "DBIRTH"

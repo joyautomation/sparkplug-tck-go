@@ -48,6 +48,7 @@ var EdgeNodeProfile = Profile{
 		EdgeNDEATHCompliant,
 		EdgeCleanSession,
 		EdgeBirthMetricNaming,
+		EdgePrimaryHostBehavior,
 		EdgeNDATACompliant,
 		EdgeDDATACompliant,
 		EdgeSeqAlwaysIncluded,
