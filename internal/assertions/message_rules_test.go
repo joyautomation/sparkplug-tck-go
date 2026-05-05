@@ -103,6 +103,49 @@ func TestDDATA_Envelope_OK(t *testing.T) {
 	}
 }
 
+func TestNDEATH_WillEnvelope(t *testing.T) {
+	good := ndeath("G", "N", u64(1)) // QoS=1, retain=false (helper default)
+	res := runner.RunAll(runner.NewCapture([]spb.Message{good}))
+	for _, id := range []string{
+		"tck-id-payloads-ndeath-will-message-qos",
+		"tck-id-payloads-ndeath-will-message-retain",
+	} {
+		if r := resultByID(t, res, id); r.Status != runner.StatusPass {
+			t.Errorf("%s: expected pass, got %+v", id, r)
+		}
+	}
+
+	bad := ndeath("G", "N", u64(1))
+	bad.QoS = 0
+	bad.Retained = true
+	res = runner.RunAll(runner.NewCapture([]spb.Message{bad}))
+	if r := resultByID(t, res, "tck-id-payloads-ndeath-will-message-qos"); r.Status != runner.StatusFail {
+		t.Errorf("expected QoS fail, got %+v", r)
+	}
+	if r := resultByID(t, res, "tck-id-payloads-ndeath-will-message-retain"); r.Status != runner.StatusFail {
+		t.Errorf("expected retain fail, got %+v", r)
+	}
+}
+
+func TestNbirthBdSeqAlias_Reports(t *testing.T) {
+	m := nbirth("G", "N", 0, 1, 5, 0, false)
+	res := runner.RunAll(runner.NewCapture([]spb.Message{m}))
+	if r := resultByID(t, res, "tck-id-topics-nbirth-bdseq-included"); r.Status != runner.StatusPass {
+		t.Errorf("expected pass via alias, got %+v", r)
+	}
+}
+
+func TestNdeathBdSeqAlias_Reports(t *testing.T) {
+	msgs := []spb.Message{
+		nbirth("G", "N", 0, 1, 5, 0, false),
+		ndeath("G", "N", u64(5)),
+	}
+	res := runner.RunAll(runner.NewCapture(msgs))
+	if r := resultByID(t, res, "tck-id-topics-nbirth-bdseq-matching"); r.Status != runner.StatusPass {
+		t.Errorf("expected pass via alias, got %+v", r)
+	}
+}
+
 func TestDDEATH_Envelope_OK(t *testing.T) {
 	good := ddeath("G", "N", "D", 9)
 	res := runner.RunAll(runner.NewCapture([]spb.Message{good}))

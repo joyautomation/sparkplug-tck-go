@@ -6,7 +6,7 @@ The official TCK is a Java/HiveMQ stack: ~10s JVM warmup, heavyweight to run as 
 
 ## Status
 
-Early but executable. Assertion catalog is extracted; the runner, session tracker, MQTT capture, and 46 of 274 assertions are wired. The CLI runs against either a JSON fixture or a live MQTT broker.
+Early but executable. Assertion catalog is extracted; the runner, session tracker, MQTT capture, and 54 of 274 assertions are wired. The CLI runs against either a JSON fixture or a live MQTT broker.
 
 ## Parity strategy
 
@@ -68,7 +68,11 @@ tck-id-payloads-nbirth-timestamp
 tck-id-payloads-nbirth-bdseq
 tck-id-payloads-ndeath-seq
 tck-id-payloads-ndeath-bdseq
+tck-id-payloads-ndeath-will-message-qos
+tck-id-payloads-ndeath-will-message-retain
 tck-id-payloads-sequence-num-incrementing
+tck-id-topics-nbirth-bdseq-included
+tck-id-topics-nbirth-bdseq-matching
 ```
 
 DBIRTH / DDATA / DDEATH / NDATA envelope (QoS, retain, seq, timestamp):
@@ -116,6 +120,10 @@ tck-id-operational-behavior-host-application-connect-will-payload
 tck-id-operational-behavior-host-application-connect-will-topic
 tck-id-operational-behavior-host-application-death-payload
 tck-id-message-flow-phid-sparkplug-state-publish-payload
+tck-id-payloads-state-birth-payload
+tck-id-payloads-state-will-message-qos
+tck-id-payloads-state-will-message-retain
+tck-id-payloads-state-will-message-payload
 ```
 
 Rebirth metric on NBIRTH (Node Control/Rebirth must be Boolean, false, no alias):
@@ -126,7 +134,7 @@ tck-id-operational-behavior-data-commands-rebirth-datatype
 tck-id-operational-behavior-data-commands-rebirth-name-aliases
 ```
 
-46 of 274. Many of the remaining assertions reduce to additional
+54 of 274. Many of the remaining assertions reduce to additional
 `messageRule` entries (see `internal/assertions/message_rules.go`).
 
 ## Regenerating the catalog

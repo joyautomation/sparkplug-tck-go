@@ -60,6 +60,7 @@ func TestEndToEnd_GoldenCompliant(t *testing.T) {
 		},
 		{
 			topic: "spBv1.0/G/NDEATH/N",
+			qos:   1, // NDEATH is the Will: published at QoS=1
 			// no Seq for NDEATH
 			payload: &spbpb.Payload{Metrics: []*spbpb.Payload_Metric{bdSeq(1)}},
 		},

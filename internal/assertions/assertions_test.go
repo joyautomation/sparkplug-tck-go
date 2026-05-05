@@ -58,9 +58,11 @@ func ndeath(group, n string, bdSeq *uint64) spb.Message {
 	if bdSeq != nil {
 		p.Metrics = []*spbpb.Payload_Metric{bdSeqMetric(*bdSeq)}
 	}
+	// NDEATH is the broker-published Will: QoS=1, retain=false.
 	return spb.Message{
 		Topic:   spb.Topic{Namespace: spb.Namespace, EdgeNodeID: spb.EdgeNodeID{Group: group, Node: n}, Type: spb.NDEATH},
 		Payload: p,
+		QoS:     1,
 	}
 }
 

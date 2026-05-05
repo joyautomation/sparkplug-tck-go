@@ -23,8 +23,12 @@ func init() {
 	runner.Register(runner.Assertion{ID: "tck-id-payloads-nbirth-seq", Run: nbirthSeqPayload})
 	runner.Register(runner.Assertion{ID: "tck-id-payloads-nbirth-timestamp", Run: nbirthTimestamp})
 	runner.Register(runner.Assertion{ID: "tck-id-payloads-nbirth-bdseq", Run: nbirthBdSeq})
+	// chapter 4 alias for the same bdSeq-presence requirement.
+	runner.Register(runner.Assertion{ID: "tck-id-topics-nbirth-bdseq-included", Run: nbirthBdSeqAlias("tck-id-topics-nbirth-bdseq-included")})
 	runner.Register(runner.Assertion{ID: "tck-id-payloads-ndeath-seq", Run: ndeathNoSeq})
 	runner.Register(runner.Assertion{ID: "tck-id-payloads-ndeath-bdseq", Run: ndeathBdSeqMatches})
+	// chapter 4 alias for the NDEATH/NBIRTH bdSeq matching requirement.
+	runner.Register(runner.Assertion{ID: "tck-id-topics-nbirth-bdseq-matching", Run: ndeathBdSeqMatchesAlias("tck-id-topics-nbirth-bdseq-matching")})
 	runner.Register(runner.Assertion{ID: "tck-id-payloads-sequence-num-incrementing", Run: seqIncrementing})
 }
 
@@ -320,6 +324,32 @@ func seqIncrementing(c *runner.Capture) []runner.Result {
 		}
 	}
 	return out
+}
+
+// nbirthBdSeqAlias and ndeathBdSeqMatchesAlias re-export the same checks
+// under additional spec IDs (chapter 4 phrases the bdSeq rules under
+// `tck-id-topics-nbirth-bdseq-*`; chapter 6 calls them
+// `tck-id-payloads-{nbirth,ndeath}-bdseq*`). The runner needs a distinct
+// AssertionFn per registered ID — these helpers rewrite the inner ID so
+// results report under the alias.
+func nbirthBdSeqAlias(aliasID string) runner.AssertionFn {
+	return func(c *runner.Capture) []runner.Result {
+		results := nbirthBdSeq(c)
+		for i := range results {
+			results[i].AssertionID = aliasID
+		}
+		return results
+	}
+}
+
+func ndeathBdSeqMatchesAlias(aliasID string) runner.AssertionFn {
+	return func(c *runner.Capture) []runner.Result {
+		results := ndeathBdSeqMatches(c)
+		for i := range results {
+			results[i].AssertionID = aliasID
+		}
+		return results
+	}
 }
 
 // hasBdSeq is a thin wrapper used by NBIRTH-bdSeq assertions; bdSeqOf

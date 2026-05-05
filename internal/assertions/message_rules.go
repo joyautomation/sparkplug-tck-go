@@ -27,6 +27,17 @@ func mustQoS0(m spb.Message) (bool, string) {
 	return true, ""
 }
 
+// mustQoSEqual returns a predicate that fails unless QoS == want. Used by
+// rules like NDEATH (Will QoS=1) where the required value isn't 0.
+func mustQoSEqual(want byte) messagePredicate {
+	return func(m spb.Message) (bool, string) {
+		if m.QoS != want {
+			return false, fmt.Sprintf("QoS = %d, want %d", m.QoS, want)
+		}
+		return true, ""
+	}
+}
+
 // mustRetainFalse implements every "<msg> MUST have retain = false".
 func mustRetainFalse(m spb.Message) (bool, string) {
 	if m.Retained {
@@ -106,6 +117,12 @@ var messageRules = []messageRule{
 	// DDEATH: must carry seq + timestamp (unlike NDEATH which has neither).
 	{id: "tck-id-payloads-ddeath-seq", mt: spb.DDEATH, pred: mustHaveSeq},
 	{id: "tck-id-payloads-ddeath-timestamp", mt: spb.DDEATH, pred: mustHaveTimestamp},
+
+	// NDEATH is registered as the MQTT Will Message (chapter 6 §3.2.1):
+	// QoS=1, retain=false. We observe the Will when the broker delivers it,
+	// so the published QoS/retain must reflect the Will configuration.
+	{id: "tck-id-payloads-ndeath-will-message-qos", mt: spb.NDEATH, pred: mustQoSEqual(1)},
+	{id: "tck-id-payloads-ndeath-will-message-retain", mt: spb.NDEATH, pred: mustRetainFalse},
 }
 
 func init() {

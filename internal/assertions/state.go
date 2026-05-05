@@ -43,6 +43,7 @@ var stateBirthIDs = struct {
 		"tck-id-host-topic-phid-birth-payload",
 		"tck-id-operational-behavior-host-application-connect-birth-payload",
 		"tck-id-message-flow-phid-sparkplug-state-publish-payload",
+		"tck-id-payloads-state-birth-payload",
 	},
 }
 
@@ -54,15 +55,18 @@ var stateDeathIDs = struct {
 	qos: []string{
 		"tck-id-host-topic-phid-death-qos",
 		"tck-id-operational-behavior-host-application-connect-will-qos",
+		"tck-id-payloads-state-will-message-qos",
 	},
 	retain: []string{
 		"tck-id-host-topic-phid-death-retain",
 		"tck-id-operational-behavior-host-application-connect-will-retained",
+		"tck-id-payloads-state-will-message-retain",
 	},
 	payload: []string{
 		"tck-id-host-topic-phid-death-payload",
 		"tck-id-operational-behavior-host-application-connect-will-payload",
 		"tck-id-operational-behavior-host-application-death-payload",
+		"tck-id-payloads-state-will-message-payload",
 	},
 }
 
