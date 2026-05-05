@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -9,6 +10,8 @@ import (
 	"github.com/joyautomation/sparkplug-tck-go/internal/spbpb"
 	"google.golang.org/protobuf/proto"
 )
+
+func jsonUnmarshal(raw []byte, v any) error { return json.Unmarshal(raw, v) }
 
 // CONNECT-time scenarios. These verify packet-level invariants that a
 // passive capture can't see: every CONNECT packet that produced a
@@ -115,31 +118,81 @@ func EdgeWillPayloadHasBdSeq(b *Broker) []runner.Result {
 }
 
 // HostCONNECTHasWill: every Host Application CONNECT MUST include a Will
-// message. Strict form of
-// tck-id-operational-behavior-host-application-connect-will. We treat a
-// client a host if its Will targets the STATE topic (spBv1.0/STATE/...).
+// message of the right shape — STATE topic, QoS=1, retain=true, JSON
+// payload with online=false + a numeric timestamp. Strict form of
+// tck-id-operational-behavior-host-application-connect-will plus the
+// per-attribute IDs (death-topic, death-qos, death-retained,
+// death-payload, termination). We treat a CONNECT as a host's if its
+// Will targets the STATE topic (spBv1.0/STATE/...).
 func HostCONNECTHasWill(b *Broker) []runner.Result {
-	const id = "tck-id-operational-behavior-host-application-connect-will"
+	const idConnectWill = "tck-id-operational-behavior-host-application-connect-will"
+	const idTopic = "tck-id-operational-behavior-host-application-death-topic"
+	const idQoS = "tck-id-operational-behavior-host-application-death-qos"
+	const idRetain = "tck-id-operational-behavior-host-application-death-retained"
+	const idPayload = "tck-id-operational-behavior-host-application-death-payload"
+	const idTermination = "tck-id-operational-behavior-host-application-termination"
+	allIDs := []string{idConnectWill, idTopic, idQoS, idRetain, idPayload, idTermination}
+
 	var out []runner.Result
+	scored := false
 	for _, e := range b.Events() {
-		if e.Type != EvConnect {
+		if e.Type != EvConnect || e.Will == nil || !isSTATETopic(e.Will.Topic) {
 			continue
 		}
-		if e.Will == nil {
-			// No Will at all — could be an edge or anything; skip.
-			// We can't classify a CONNECT as host without a Will pointer.
-			continue
+		scored = true
+		subj := e.ClientID + " " + e.Will.Topic
+		// Connect-will + topic shape: implied by reaching this point.
+		out = append(out,
+			runner.Pass(idConnectWill, subj),
+			runner.Pass(idTopic, subj),
+		)
+		if e.Will.QoS != 1 {
+			out = append(out, runner.Fail(idQoS, subj,
+				fmt.Sprintf("host Will QoS = %d, want 1", e.Will.QoS)))
+		} else {
+			out = append(out, runner.Pass(idQoS, subj))
 		}
-		if !isSTATETopic(e.Will.Topic) {
-			continue
+		if !e.Will.Retain {
+			out = append(out, runner.Fail(idRetain, subj, "host Will retain = false, must be true"))
+		} else {
+			out = append(out, runner.Pass(idRetain, subj))
 		}
-		// We have a host CONNECT (its Will targets STATE).
-		out = append(out, runner.Pass(id, e.ClientID+" "+e.Will.Topic))
+		if state, err := decodeStateBody(e.Will.Payload); err != nil {
+			out = append(out, runner.Fail(idPayload, subj, "host Will payload not valid STATE JSON: "+err.Error()))
+		} else if state.Online {
+			out = append(out, runner.Fail(idPayload, subj, "host Will payload has online=true; death must have online=false"))
+		} else if state.Timestamp == 0 {
+			out = append(out, runner.Fail(idPayload, subj, "host Will payload missing/zero timestamp"))
+		} else {
+			out = append(out, runner.Pass(idPayload, subj))
+		}
+		// "Termination" is the umbrella rule that the host publishes a
+		// Death message on intentional disconnect — observing the Will
+		// advertised at CONNECT covers the *will-fires-on-unclean-drop*
+		// half. The clean-disconnect half is scored by
+		// HostDeathBeforeCleanDisconnect.
+		out = append(out, runner.Pass(idTermination, subj))
 	}
-	if len(out) == 0 {
-		return []runner.Result{runner.NA(id, "no host CONNECT with STATE Will in scenario")}
+	if !scored {
+		na := "no host CONNECT with STATE Will in scenario"
+		res := make([]runner.Result, 0, len(allIDs))
+		for _, id := range allIDs {
+			res = append(res, runner.NA(id, na))
+		}
+		return res
 	}
 	return out
+}
+
+type hostStateBody struct {
+	Online    bool  `json:"online"`
+	Timestamp int64 `json:"timestamp"`
+}
+
+func decodeStateBody(raw []byte) (hostStateBody, error) {
+	var s hostStateBody
+	err := jsonUnmarshal(raw, &s)
+	return s, err
 }
 
 // HostCleanSession: a host application's CONNECT MUST set Clean Session

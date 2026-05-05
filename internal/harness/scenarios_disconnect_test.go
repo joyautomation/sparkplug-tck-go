@@ -72,8 +72,14 @@ func TestHostDeathBeforeCleanDisconnect_Pass(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	res := HostDeathBeforeCleanDisconnect(b)
-	if len(res) != 1 || res[0].Status != runner.StatusPass {
-		t.Errorf("expected pass, got %+v", res)
+	if len(res) == 0 {
+		t.Errorf("expected at least one result, got none")
+	}
+	for _, r := range res {
+		if r.Status != runner.StatusPass {
+			t.Errorf("expected all pass, got %+v", res)
+			break
+		}
 	}
 }
 
@@ -87,8 +93,14 @@ func TestHostDeathBeforeCleanDisconnect_NoDeath(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	res := HostDeathBeforeCleanDisconnect(b)
-	if len(res) != 1 || res[0].Status != runner.StatusFail {
-		t.Errorf("expected fail (no death publish), got %+v", res)
+	if len(res) == 0 {
+		t.Errorf("expected at least one result, got none")
+	}
+	for _, r := range res {
+		if r.Status != runner.StatusFail {
+			t.Errorf("expected all fail (no death publish), got %+v", res)
+			break
+		}
 	}
 }
 
@@ -105,8 +117,14 @@ func TestHostDeathBeforeCleanDisconnect_OnlineLast(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	res := HostDeathBeforeCleanDisconnect(b)
-	if len(res) != 1 || res[0].Status != runner.StatusFail {
-		t.Errorf("expected fail (last STATE was online), got %+v", res)
+	if len(res) == 0 {
+		t.Errorf("expected at least one result, got none")
+	}
+	for _, r := range res {
+		if r.Status != runner.StatusFail {
+			t.Errorf("expected all fail (last STATE was online), got %+v", res)
+			break
+		}
 	}
 }
 

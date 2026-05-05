@@ -66,7 +66,19 @@ func HostWillTimestampIsRecent(b *Broker) []runner.Result {
 // tck-id-host-topic-phid-death-payload-timestamp-disconnect-clean.
 func HostDeathBeforeCleanDisconnect(b *Broker) []runner.Result {
 	const id = "tck-id-host-topic-phid-death-payload-timestamp-disconnect-clean"
-	return hostDeathBeforeDisconnect(b, id, true)
+	// disconnect-intentional has the same observation: after publishing
+	// the Death message a DISCONNECT packet MAY follow. We pass it on
+	// the same host-clean-disconnect path.
+	const idIntent = "tck-id-operational-behavior-host-application-disconnect-intentional"
+	res := hostDeathBeforeDisconnect(b, id, true)
+	out := make([]runner.Result, 0, len(res)*2)
+	for _, r := range res {
+		out = append(out, r)
+		mirror := r
+		mirror.AssertionID = idIntent
+		out = append(out, mirror)
+	}
+	return out
 }
 
 // HostDeathBeforeUncleanDisconnect: same rule for unclean teardowns

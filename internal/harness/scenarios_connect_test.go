@@ -122,8 +122,14 @@ func TestHostCONNECTHasWill_Pass(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	res := HostCONNECTHasWill(b)
-	if len(res) != 1 || res[0].Status != runner.StatusPass {
-		t.Errorf("expected pass, got %+v", res)
+	if len(res) == 0 {
+		t.Errorf("expected at least one result, got none")
+	}
+	for _, r := range res {
+		if r.Status != runner.StatusPass {
+			t.Errorf("expected all pass, got %+v", res)
+			break
+		}
 	}
 }
 

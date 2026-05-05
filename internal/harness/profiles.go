@@ -59,6 +59,8 @@ var HostApplicationProfile = Profile{
 		HostDeathBeforeCleanDisconnect,
 		HostDeathBeforeUncleanDisconnect,
 		HostMessageOrdering,
+		HostNDEATHActions,
+		HostDDEATHActions,
 	},
 }
 
