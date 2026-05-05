@@ -38,9 +38,10 @@ import (
 type driverKind string
 
 const (
-	driverEdge       driverKind = "edge"
-	driverHost       driverKind = "host"
-	driverHostOnline driverKind = "host-online"
+	driverEdge        driverKind = "edge"
+	driverHost        driverKind = "host"
+	driverHostOnline  driverKind = "host-online"
+	driverEdgePrimary driverKind = "edge-primary"
 )
 
 const (
@@ -133,6 +134,9 @@ func main() {
 		case driverEdge:
 			args = []string{runHost, *groupID, runEdge, *deviceID}
 			driver = func() { driveCompliantEdge(*broker, runHost, *groupID, runEdge, *deviceID) }
+		case driverEdgePrimary:
+			args = []string{runHost, *groupID, runEdge, *deviceID}
+			driver = func() { drivePrimaryHostEdge(*broker, runHost, *groupID, runEdge, *deviceID) }
 		case driverHost:
 			args = []string{runHost}
 			driver = func() { driveCompliantHost(*broker, runHost) }
@@ -221,6 +225,9 @@ func driverKindFor(profile, testName string) driverKind {
 			return driverHostOnline
 		}
 		return driverHost
+	}
+	if profile == "edge" && testName == "PrimaryHostTest" {
+		return driverEdgePrimary
 	}
 	return driverEdge
 }
@@ -452,6 +459,160 @@ func driveCompliantEdge(broker, _, group, edge, device string) {
 	c.Publish(fmt.Sprintf("spBv1.0/%s/DDEATH/%s/%s", group, edge, device), 0, false,
 		ddeathPayload(time.Now().UnixMilli(), seq)).WaitTimeout(2 * time.Second)
 	seq++
+	c.Publish(fmt.Sprintf("spBv1.0/%s/NDEATH/%s", group, edge), 0, false,
+		bdSeqPayload(bdSeq)).WaitTimeout(2 * time.Second)
+}
+
+// drivePrimaryHostEdge runs an edge node configured with a primary host
+// id. The TCK's PrimaryHostTest provokes the edge by toggling the host's
+// retained STATE — wrong-host-online (ignore), correct-host-offline
+// (don't BIRTH), correct-host-online (BIRTH), then offline / older-ts /
+// online-again. The edge MUST:
+//   - Wait for STATE online for the configured host before publishing BIRTH
+//   - Compare timestamps and ignore older STATE updates
+//   - Publish NDEATH + DDEATH and disconnect when the host goes offline
+//   - Re-BIRTH when the host comes back
+func drivePrimaryHostEdge(broker, hostID, group, edge, device string) {
+	stateTopic := fmt.Sprintf("spBv1.0/STATE/%s", hostID)
+	willTopic := fmt.Sprintf("spBv1.0/%s/NDEATH/%s", group, edge)
+	ncmdSub := fmt.Sprintf("spBv1.0/%s/NCMD/%s", group, edge)
+	dcmdSub := fmt.Sprintf("spBv1.0/%s/DCMD/%s/%s", group, edge, device)
+
+	var (
+		mu          sync.Mutex
+		client      mqtt.Client
+		bdSeq       uint64
+		seq         uint64
+		online      bool
+		lastTS      int64
+		birthSent   bool
+		quitCh      = make(chan struct{})
+	)
+
+	connect := func() (mqtt.Client, error) {
+		bdSeqVal := bdSeq
+		mu.Lock()
+		// Reset per-connect bookkeeping; bdSeq increments per CONNECT.
+		seq = 0
+		mu.Unlock()
+		opts := mqtt.NewClientOptions().
+			AddBroker(broker).
+			SetClientID("tck-correctness-edge-"+edge).
+			SetCleanSession(true).
+			SetConnectTimeout(5 * time.Second).
+			SetBinaryWill(willTopic, bdSeqPayload(bdSeqVal), 1, false).
+			SetDefaultPublishHandler(func(_ mqtt.Client, msg mqtt.Message) {
+				if msg.Topic() != stateTopic {
+					return
+				}
+				var s struct {
+					Online    bool  `json:"online"`
+					Timestamp int64 `json:"timestamp"`
+				}
+				if err := json.Unmarshal(msg.Payload(), &s); err != nil {
+					return
+				}
+				mu.Lock()
+				if s.Timestamp <= lastTS {
+					mu.Unlock()
+					return
+				}
+				lastTS = s.Timestamp
+				wasOnline := online
+				online = s.Online
+				cli := client
+				mu.Unlock()
+				if cli == nil {
+					return
+				}
+				if online && !birthSent {
+					mu.Lock()
+					birthSent = true
+					mu.Unlock()
+					publishBirths(cli, group, edge, device, &seq, bdSeqVal)
+				} else if !online && wasOnline {
+					publishDeaths(cli, group, edge, device, &seq, bdSeqVal)
+					cli.Disconnect(200)
+					mu.Lock()
+					client = nil
+					birthSent = false
+					mu.Unlock()
+				}
+			})
+		c := mqtt.NewClient(opts)
+		if tok := c.Connect(); !tok.WaitTimeout(5*time.Second) || tok.Error() != nil {
+			return nil, fmt.Errorf("connect: %v", tok.Error())
+		}
+		c.Subscribe(stateTopic, 1, nil).WaitTimeout(2 * time.Second)
+		c.Subscribe(ncmdSub, 1, nil).WaitTimeout(2 * time.Second)
+		c.Subscribe(dcmdSub, 1, nil).WaitTimeout(2 * time.Second)
+		return c, nil
+	}
+
+	c, err := connect()
+	if err != nil {
+		return
+	}
+	mu.Lock()
+	client = c
+	mu.Unlock()
+
+	// Reconnect loop — when the edge disconnects after host goes offline,
+	// reconnect and wait for STATE online again to BIRTH.
+	go func() {
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-quitCh:
+				return
+			case <-ticker.C:
+				mu.Lock()
+				cli := client
+				mu.Unlock()
+				if cli == nil {
+					nc, err := connect()
+					if err != nil {
+						continue
+					}
+					mu.Lock()
+					client = nc
+					bdSeq++
+					mu.Unlock()
+				}
+			}
+		}
+	}()
+
+	// Hold open long enough to walk the test's full state machine
+	// (~18 s of host-state toggles plus settle time).
+	time.Sleep(30 * time.Second)
+	close(quitCh)
+
+	mu.Lock()
+	cli := client
+	mu.Unlock()
+	if cli != nil {
+		// Clean shutdown: publish DDEATH+NDEATH, disconnect cleanly.
+		publishDeaths(cli, group, edge, device, &seq, bdSeq)
+		cli.Disconnect(200)
+	}
+}
+
+func publishBirths(c mqtt.Client, group, edge, device string, seq *uint64, bdSeq uint64) {
+	now := time.Now().UnixMilli()
+	c.Publish(fmt.Sprintf("spBv1.0/%s/NBIRTH/%s", group, edge), 0, false,
+		nbirthPayload(now, *seq, bdSeq)).WaitTimeout(2 * time.Second)
+	*seq++
+	c.Publish(fmt.Sprintf("spBv1.0/%s/DBIRTH/%s/%s", group, edge, device), 0, false,
+		dbirthPayload(now, *seq)).WaitTimeout(2 * time.Second)
+	*seq++
+}
+
+func publishDeaths(c mqtt.Client, group, edge, device string, seq *uint64, bdSeq uint64) {
+	c.Publish(fmt.Sprintf("spBv1.0/%s/DDEATH/%s/%s", group, edge, device), 0, false,
+		ddeathPayload(time.Now().UnixMilli(), *seq)).WaitTimeout(2 * time.Second)
+	*seq++
 	c.Publish(fmt.Sprintf("spBv1.0/%s/NDEATH/%s", group, edge), 0, false,
 		bdSeqPayload(bdSeq)).WaitTimeout(2 * time.Second)
 }
