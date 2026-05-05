@@ -6,7 +6,7 @@ The official TCK is a Java/HiveMQ stack: ~10s JVM warmup, heavyweight to run as 
 
 ## Status
 
-Early but executable. Assertion catalog is extracted; the runner, session tracker, and the first 9 assertions are wired. The CLI accepts a JSON fixture today; a live MQTT harness is the next chunk.
+Early but executable. Assertion catalog is extracted; the runner, session tracker, MQTT capture, and 26 of 274 assertions are wired. The CLI runs against either a JSON fixture or a live MQTT broker.
 
 ## Parity strategy
 
@@ -41,19 +41,24 @@ assertions.json           # checked-in catalog; regenerate via script
 
 ## Running the CLI
 
-Today it consumes a JSON fixture (one entry per MQTT message — base64-encoded
-Sparkplug protobuf or STATE bytes). The MQTT harness will subscribe to a live
-broker in the next iteration.
+Two input modes:
 
 ```sh
-go run ./cmd/sparkplug-tck -fixture path/to/capture.json
-go run ./cmd/sparkplug-tck -fixture - -json < capture.json   # JSON results to stdout
+# Offline: replay a recorded fixture (one entry per MQTT message — base64
+# Sparkplug protobuf or STATE bytes).
+go run ./cmd/sparkplug-tck -fixture capture.json
+go run ./cmd/sparkplug-tck -fixture - -json < capture.json
+
+# Online: subscribe to a live broker, capture for a duration, then assert.
+go run ./cmd/sparkplug-tck -broker tcp://localhost:1883 -duration 30s
+go run ./cmd/sparkplug-tck -broker tcp://broker:1883 -username u -password p -duration 1m -json
 ```
 
 Exit code is non-zero if any assertion failed.
 
 ## Implemented assertions
 
+NBIRTH / NDEATH lifecycle:
 ```
 tck-id-topic-structure-namespace-a
 tck-id-topics-nbirth-mqtt
@@ -66,8 +71,33 @@ tck-id-payloads-ndeath-bdseq
 tck-id-payloads-sequence-num-incrementing
 ```
 
-9 of 274. Adding more is a matter of `runner.Register` + a small function;
-see `internal/assertions/assertions.go`.
+DBIRTH / DDATA / DDEATH / NDATA envelope (QoS, retain, seq, timestamp):
+```
+tck-id-payloads-dbirth-qos
+tck-id-payloads-dbirth-retain
+tck-id-payloads-dbirth-seq
+tck-id-payloads-dbirth-timestamp
+tck-id-payloads-ndata-qos
+tck-id-payloads-ndata-retain
+tck-id-payloads-ndata-seq
+tck-id-payloads-ndata-timestamp
+tck-id-payloads-ddata-qos
+tck-id-payloads-ddata-retain
+tck-id-payloads-ddata-seq
+tck-id-payloads-ddata-timestamp
+tck-id-payloads-ddeath-seq
+tck-id-payloads-ddeath-timestamp
+```
+
+Per-edge ordering:
+```
+tck-id-payloads-dbirth-order
+tck-id-payloads-ndata-order
+tck-id-payloads-ddata-order
+```
+
+26 of 274. Many of the remaining assertions reduce to additional
+`messageRule` entries (see `internal/assertions/message_rules.go`).
 
 ## Regenerating the catalog
 
@@ -85,9 +115,11 @@ Set `SPARKPLUG_SPEC_REF` to pin a tag instead of `master`.
 - [x] Assertion runner + result types
 - [x] First batch of NBIRTH/NDEATH/sequence assertions (9)
 - [x] Fixture-driven CLI for offline runs
-- [ ] MQTT harness — live capture against a broker (paho client, retained STATE)
-- [ ] Payload-level checks at scale (108 mostly-mechanical assertions)
-- [ ] Sequencing checks: rebirth, STATE, alias rules (63)
+- [x] MQTT harness — live capture against a broker (paho client)
+- [x] Second batch: DBIRTH/NDATA/DDATA/DDEATH envelope + ordering (17)
+- [ ] Remaining payload-level checks (~80 mechanical)
+- [ ] Sequencing checks: rebirth, STATE, alias rules
+- [ ] Host STATE assertions (3.x JSON shape, retain rules)
 - [ ] Edge-node profile parity with HiveMQ TCK
 - [ ] Host-application profile parity
 - [ ] CI: scheduled spec-drift detection

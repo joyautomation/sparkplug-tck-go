@@ -1,21 +1,25 @@
 // Command sparkplug-tck runs the registered TCK assertions against a
 // captured sequence of Sparkplug messages.
 //
-// Today the only input format is a JSON fixture (see -fixture). Once the
-// MQTT harness lands, an alternative -broker mode will subscribe to a live
-// broker and assemble the capture on the fly.
+// Two input modes:
+//   -fixture <path|->   JSON fixture (offline, deterministic)
+//   -broker <url>       Live MQTT broker; capture for -duration then assert
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	_ "github.com/joyautomation/sparkplug-tck-go/internal/assertions" // registry side-effects
+	"github.com/joyautomation/sparkplug-tck-go/internal/capture"
 	"github.com/joyautomation/sparkplug-tck-go/internal/runner"
 	"github.com/joyautomation/sparkplug-tck-go/internal/spb"
 )
@@ -45,17 +49,27 @@ type fixtureMsg struct {
 
 func main() {
 	fixture := flag.String("fixture", "", "path to JSON fixture file (use - for stdin)")
+	broker := flag.String("broker", "", "MQTT broker URL (e.g. tcp://localhost:1883)")
+	username := flag.String("username", "", "MQTT username (with -broker)")
+	password := flag.String("password", "", "MQTT password (with -broker)")
+	duration := flag.Duration("duration", 30*time.Second, "capture duration when using -broker")
 	jsonOut := flag.Bool("json", false, "emit results as JSON instead of human-readable")
 	flag.Parse()
 
-	if *fixture == "" {
-		fmt.Fprintln(os.Stderr, "usage: sparkplug-tck -fixture <path|->")
+	if (*fixture == "") == (*broker == "") {
+		fmt.Fprintln(os.Stderr, "usage: sparkplug-tck (-fixture <path|->) | (-broker <url> [-duration 30s])")
 		os.Exit(2)
 	}
 
-	msgs, err := loadFixture(*fixture)
+	var msgs []spb.Message
+	var err error
+	if *fixture != "" {
+		msgs, err = loadFixture(*fixture)
+	} else {
+		msgs, err = liveCapture(*broker, *username, *password, *duration)
+	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "load fixture: %v\n", err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 
@@ -72,6 +86,30 @@ func main() {
 	if hasFail(results) {
 		os.Exit(1)
 	}
+}
+
+// liveCapture connects to a broker and runs until duration elapses or the
+// process receives SIGINT/SIGTERM. Stats (capture/drop counts) are printed
+// to stderr so the JSON or human result table on stdout stays clean.
+func liveCapture(brokerURL, username, password string, duration time.Duration) ([]spb.Message, error) {
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
+	fmt.Fprintf(os.Stderr, "capturing from %s for %s (Ctrl-C to stop early)\n", brokerURL, duration)
+	msgs, stats, err := capture.Run(ctx, capture.Options{
+		BrokerURL: brokerURL,
+		Username:  username,
+		Password:  password,
+		Duration:  duration,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("capture: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "captured %d messages (%d dropped)\n", stats.Captured, stats.Dropped)
+	for _, e := range stats.SampleErrors {
+		fmt.Fprintf(os.Stderr, "  drop: %v\n", e)
+	}
+	return msgs, nil
 }
 
 func loadFixture(path string) ([]spb.Message, error) {
