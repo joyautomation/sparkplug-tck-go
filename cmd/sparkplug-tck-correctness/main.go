@@ -140,6 +140,13 @@ func main() {
 			fmt.Fprintf(os.Stderr, "%s — TIMEOUT after %s, partial results captured\n", spec, *timeout)
 		}
 		_ = ctrl.endTest()
+		// END_TEST triggers the TCK extension to publish a SECOND, empty
+		// OVERALL summary. If we let it leak into the next test slot, it
+		// closes that test's channel and waitForOverall returns instantly
+		// before the new SUT can connect. Sleep briefly so the spurious
+		// OVERALL lands here, then reset() at top of the next iteration
+		// discards it.
+		time.Sleep(500 * time.Millisecond)
 
 		rep := ctrl.report(profile + "/" + testName)
 		reports = append(reports, rep)
@@ -285,6 +292,13 @@ func (c *collector) onResult(_ mqtt.Client, msg mqtt.Message) {
 			continue
 		}
 		c.mu.Lock()
+		// Ignore everything after the first OVERALL — END_TEST triggers the
+		// TCK extension to publish a SECOND empty summary that would
+		// otherwise corrupt our verdicts and OVERALL status.
+		if c.overall != "" {
+			c.mu.Unlock()
+			continue
+		}
 		if id == "OVERALL" {
 			c.overall = status
 			c.mu.Unlock()
