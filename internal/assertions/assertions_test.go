@@ -17,9 +17,10 @@ func str(v string) *string { return &v }
 
 func bdSeqMetric(v uint64) *spbpb.Payload_Metric {
 	return &spbpb.Payload_Metric{
-		Name:     str("bdSeq"),
-		Datatype: u32(uint32(spbpb.DataType_UInt64)),
-		Value:    &spbpb.Payload_Metric_LongValue{LongValue: v},
+		Name:      str("bdSeq"),
+		Timestamp: u64(1),
+		Datatype:  u32(uint32(spbpb.DataType_UInt64)),
+		Value:     &spbpb.Payload_Metric_LongValue{LongValue: v},
 	}
 }
 
@@ -28,9 +29,10 @@ func bdSeqMetric(v uint64) *spbpb.Payload_Metric {
 // via the nbirth helper; rebirth-specific tests build their own.
 func stdRebirthMetric() *spbpb.Payload_Metric {
 	return &spbpb.Payload_Metric{
-		Name:     str(rebirthMetricName),
-		Datatype: u32(uint32(spbpb.DataType_Boolean)),
-		Value:    &spbpb.Payload_Metric_BooleanValue{BooleanValue: false},
+		Name:      str(rebirthMetricName),
+		Timestamp: u64(1),
+		Datatype:  u32(uint32(spbpb.DataType_Boolean)),
+		Value:     &spbpb.Payload_Metric_BooleanValue{BooleanValue: false},
 	}
 }
 

@@ -21,22 +21,24 @@ func TestEndToEnd_GoldenCompliant(t *testing.T) {
 	u64 := func(v uint64) *uint64 { return &v }
 	str := func(v string) *string { return &v }
 	u32 := func(v uint32) *uint32 { return &v }
+	ts := uint64(time.Now().UnixMilli())
 	bdSeq := func(v uint64) *spbpb.Payload_Metric {
 		return &spbpb.Payload_Metric{
-			Name:     str("bdSeq"),
-			Datatype: u32(uint32(spbpb.DataType_UInt64)),
-			Value:    &spbpb.Payload_Metric_LongValue{LongValue: v},
+			Name:      str("bdSeq"),
+			Timestamp: u64(ts),
+			Datatype:  u32(uint32(spbpb.DataType_UInt64)),
+			Value:     &spbpb.Payload_Metric_LongValue{LongValue: v},
 		}
 	}
 	rebirth := func() *spbpb.Payload_Metric {
 		return &spbpb.Payload_Metric{
-			Name:     str("Node Control/Rebirth"),
-			Datatype: u32(uint32(spbpb.DataType_Boolean)),
-			Value:    &spbpb.Payload_Metric_BooleanValue{BooleanValue: false},
+			Name:      str("Node Control/Rebirth"),
+			Timestamp: u64(ts),
+			Datatype:  u32(uint32(spbpb.DataType_Boolean)),
+			Value:     &spbpb.Payload_Metric_BooleanValue{BooleanValue: false},
 		}
 	}
 
-	ts := uint64(time.Now().UnixMilli())
 	payloads := []struct {
 		topic   string
 		qos     byte

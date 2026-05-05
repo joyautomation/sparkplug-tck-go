@@ -233,7 +233,30 @@ tck-id-payloads-{ndata,ddata,dbirth,ddeath}-seq-inc
 tck-id-payloads-state-{birth,subscribe,will-message}
 ```
 
-173 of 274. Many of the remaining assertions reduce to additional
+Operational-behavior data-publish (per-payload metric ordering + value/isnull
+rule + presence aliases for "every metric ever" / "DATA on change") and
+NCMD-side rebirth (Node Control/Rebirth metric, value=true, NCMD verb):
+```
+tck-id-operational-behavior-data-publish-{nbirth,dbirth}-{order,values}
+tck-id-operational-behavior-data-publish-{nbirth,dbirth,nbirth-change,dbirth-change}
+tck-id-operational-behavior-data-commands-ncmd-rebirth-{name,value,verb}
+```
+
+Template definition aliases (chapter-6 IDs that restate per-shape rules
+under the `template-definition-*` namespace) plus misc trivial-pass
+aliases (UTC timestamps, namespace structure, NDEATH-as-Will, datatype
+SHOULD-NOT in DATA/CMD, timestamp MUST in BIRTH/DATA metrics):
+```
+tck-id-payloads-template-definition-{is-definition,ref,nbirth,nbirth-only,parameters,parameters-default,members}
+tck-id-payloads-template-{version,dataset-value}
+tck-id-payloads-{timestamp-in-UTC,metric-timestamp-in-UTC}
+tck-id-payloads-ndeath-will-message
+tck-id-topic-structure
+tck-id-payloads-metric-datatype-not-req
+tck-id-payloads-name-{birth-data-requirement,cmd-requirement}
+```
+
+200 of 274. Many of the remaining assertions reduce to additional
 `messageRule` entries (see `internal/assertions/message_rules.go`).
 
 ## Regenerating the catalog
@@ -255,6 +278,7 @@ Set `SPARKPLUG_SPEC_REF` to pin a tag instead of `master`.
 - [x] MQTT harness — live capture against a broker (paho client)
 - [x] Second batch: DBIRTH/NDATA/DDATA/DDEATH envelope + ordering (17)
 - [x] Third batch: host STATE envelope/topic + rebirth metric (20)
+- [x] Fourth batch: data-publish + template-definition + UTC + NCMD rebirth (27)
 - [ ] Remaining payload-level checks (~80 mechanical)
 - [ ] Alias rules + sequencing checks not yet covered
 - [ ] Edge-node profile parity with HiveMQ TCK
