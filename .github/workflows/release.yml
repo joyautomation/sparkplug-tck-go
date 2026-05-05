@@ -1,0 +1,73 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Build binaries
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+          VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist/staging
+          ext=""
+          [ "$GOOS" = "windows" ] && ext=".exe"
+          for cmd in sparkplug-tck sparkplug-tck-bench sparkplug-tck-correctness sparkplug-tck-diff; do
+            go build -trimpath -ldflags="-s -w -X main.Version=${VERSION}" \
+              -o "dist/staging/${cmd}${ext}" "./cmd/${cmd}"
+          done
+          # Bundle the spec catalog + upstream inventory so the bench
+          # works out of the tarball without needing the repo.
+          cp assertions.json upstream_tests.json README.md LICENSE NOTICE dist/staging/
+
+          name="sparkplug-tck-go_${VERSION}_${GOOS}_${GOARCH}"
+          if [ "$GOOS" = "windows" ]; then
+            (cd dist/staging && zip -r "../${name}.zip" .)
+          else
+            tar -C dist/staging -czf "dist/${name}.tar.gz" .
+          fi
+          rm -rf dist/staging
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Compute checksums
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
