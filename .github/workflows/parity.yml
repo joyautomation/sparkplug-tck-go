@@ -32,13 +32,49 @@ jobs:
           cd .upstream-tck-cache/sparkplug-master
           ./gradlew :tck:prepareHivemqHome
 
-      - name: Boot HiveMQ + TCK extension
-        run: bash scripts/upstream-tck/start-hivemq.sh
-
       - name: Run upstream Java TCK against synthetic SUT
+        # HiveMQ persistence wedges after long-running tests (QoS1 ack
+        # timeouts on subsequent startTest). Bounce the broker between
+        # every test to keep state pristine.
         run: |
           go build ./cmd/sparkplug-tck-correctness
-          ./sparkplug-tck-correctness > java.json
+          tests=(
+            "edge SessionEstablishmentTest"
+            "edge SendDataTest"
+            "edge SendComplexDataTest"
+            "edge SessionTerminationTest"
+            "edge ReceiveCommandTest"
+            "edge PrimaryHostTest"
+            "host SessionEstablishmentTest"
+            "host SessionTerminationTest"
+            "host EdgeSessionTerminationTest"
+            "host MessageOrderingTest"
+            "host SendCommandTest"
+          )
+          mkdir -p .parity-per-test
+          for t in "${tests[@]}"; do
+            slug="$(echo "$t" | tr ' /' '__')"
+            echo "::group::$t"
+            bash scripts/upstream-tck/start-hivemq.sh
+            ./sparkplug-tck-correctness -tests "$t" > ".parity-per-test/${slug}.json" || true
+            bash scripts/upstream-tck/stop-hivemq.sh || true
+            # Wipe persistence so the next start is truly fresh.
+            rm -rf .upstream-tck-cache/sparkplug-master/tck/build/hivemq-home/data || true
+            echo "::endgroup::"
+          done
+          # Merge per-test reports into a single java.json (same shape
+          # as a single full-sweep run: {"tests":[...]}).
+          python3 - <<'PY'
+          import json, glob
+          merged = []
+          for path in sorted(glob.glob('.parity-per-test/*.json')):
+              try:
+                  data = json.load(open(path))
+              except Exception:
+                  continue
+              merged.extend(data.get('tests') or [])
+          json.dump({'tests': merged}, open('java.json', 'w'), indent=2)
+          PY
 
       - name: Run Go bench
         run: |
@@ -68,9 +104,9 @@ jobs:
               sys.exit(f"{conflicts} logic conflict(s) — see diff.json artefact")
           if pct < 99.0:
               sys.exit(f"logic agreement {pct:.1f}% < floor 99%")
-          # Tolerate up to 2 infra failures (HiveMQ flakes mid-sweep). More
-          # than that means the env is wedged — fail so we notice.
-          if len(infra) > 2:
+          # With per-test HiveMQ bouncing, infra failures should be 0.
+          # Tolerate 1 in case of a one-off boot hiccup.
+          if len(infra) > 1:
               sys.exit(f"{len(infra)} infra-failed tests, likely env wedged: {infra}")
           PY
 
