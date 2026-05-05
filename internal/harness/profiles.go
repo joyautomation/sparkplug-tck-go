@@ -34,6 +34,8 @@ var EdgeNodeProfile = Profile{
 		EdgeNCMDSubscribeQoS,
 		DeviceDCMDSubscribeQoS,
 		NDEATHBeforeDisconnect,
+		EdgeBdSeqMatchesWill,
+		EdgeBdSeqIncrements,
 	},
 }
 
