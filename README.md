@@ -6,7 +6,14 @@ The official TCK is a Java/HiveMQ stack: ~10s JVM warmup, heavyweight to run as 
 
 ## Status
 
-Early but executable. Assertion catalog is extracted; the runner, session tracker, MQTT capture, and **all 274 assertions** are wired. The CLI runs against either a JSON fixture or a live MQTT broker. Many host-side and connection-level rules currently reduce to "presence in capture" — tightening those to causal/ordering checks is a follow-up that needs additional session-level state.
+Early but executable. Assertion catalog is extracted; the runner, session tracker, MQTT capture, and **all 274 assertions** are wired.
+
+The runner has two modes:
+
+- **Passive** (default) — point at any broker (or a JSON fixture), capture, assert. Strict on payload + topic + per-edge ordering; reduces connection-level rules ("Edge MUST publish NDEATH before DISCONNECT", "host CONNECT MUST set Clean Session=true") to "presence in capture" since CONNECT/DISCONNECT/Will packets aren't observable from a sniffer.
+- **Harness** (proof of concept landed; see `internal/harness/`) — runs an in-process MQTT broker (mochi) that the SUT connects to, records every CONNECT/PUBLISH/SUBSCRIBE/DISCONNECT/Will-sent packet in arrival order, and runs scenario-style scripts that verify causal ordering + connection-level rules directly. Mirrors what the upstream HiveMQ-based TCK does, in Go.
+
+The architectural split is the same as the upstream TCK's: passive mode is fast and runs against any deployment; harness mode is the conformance gate.
 
 ## Parity strategy
 
@@ -33,6 +40,8 @@ internal/session/         # per-edge-node state tracker
 internal/runner/          # assertion registry + result types
 internal/assertions/      # individual [tck-id-*] checks (importing this
                           # package wires every check into the runner)
+internal/harness/         # in-process mochi broker + scenario runner for
+                          # Layer-3 (CONNECT/DISCONNECT/ordering) rules
 proto/sparkplug_b.proto   # vendored from eclipse-tahu (byte-identical)
 scripts/gen-proto.sh
 scripts/update-assertions.sh
@@ -320,6 +329,10 @@ Set `SPARKPLUG_SPEC_REF` to pin a tag instead of `master`.
 - [x] Fifth batch: birth-metric + template-instance + cmd-metric aliases (21)
 - [x] Sixth batch: host STATE/PHID + edge-termination + case-sensitivity (53)
 - [x] **Catalog complete (274/274).**
+- [x] Harness POC: mochi broker + first strict scenario (NDEATH-before-DISCONNECT)
+- [ ] Harness scenarios: Will-message verification, NCMD subscription QoS, host Clean Session flag, intentional-disconnect ordering
+- [ ] Harness profiles: edge-node + host-application conformance suites
+- [ ] CI integration for harness scenarios (separate build tag — slower than passive)
 - [ ] Remaining payload-level checks (~80 mechanical)
 - [ ] Alias rules + sequencing checks not yet covered
 - [ ] Edge-node profile parity with HiveMQ TCK
