@@ -1,16 +1,14 @@
-# Binaries
-/bin/
+# Spec/upstream caches refreshed by scripts/
+.spec-cache/
+.upstream-tck-cache/
+
+# go build artifacts at the repo root
+/sparkplug-tck
+/sparkplug-tck-bench
+/sparkplug-tck-correctness
+/sparkplug-tck-diff
 /extract-assertions
-*.exe
 
-# Local spec checkout used by scripts/update-assertions.sh
-/.spec-cache/
-
-# Go
-*.test
-*.out
-coverage.txt
-
-# Editor
-.idea/
-.vscode/
+# upstream-tck HiveMQ runtime state
+scripts/upstream-tck/hivemq.pid
+scripts/upstream-tck/hivemq.out

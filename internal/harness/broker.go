@@ -36,16 +36,17 @@ const (
 // Event is one packet observed by the broker. Scenarios consume an
 // ordered slice of these to verify causality across the connection.
 type Event struct {
-	At         time.Time
-	Type       EventType
-	ClientID   string
-	Topic      string  // PUBLISH, WILL_SENT, SUBSCRIBE
-	QoS        byte    // PUBLISH, SUBSCRIBE, WILL
-	Retained   bool    // PUBLISH, WILL
-	CleanStart bool    // CONNECT (3.1.1: Clean Session, 5.0: Clean Start)
-	Will       *Will   // CONNECT
-	Payload    []byte  // PUBLISH, WILL_SENT
-	DiscErr    string  // DISCONNECT — non-empty if the disconnect was unclean
+	At              time.Time
+	Type            EventType
+	ClientID        string
+	Topic           string // PUBLISH, WILL_SENT, SUBSCRIBE
+	QoS             byte   // PUBLISH, SUBSCRIBE, WILL
+	Retained        bool   // PUBLISH, WILL
+	CleanStart      bool   // CONNECT (3.1.1: Clean Session, 5.0: Clean Start)
+	ProtocolVersion byte   // CONNECT — 4 = MQTT 3.1.1, 5 = MQTT 5
+	Will            *Will  // CONNECT
+	Payload         []byte // PUBLISH, WILL_SENT
+	DiscErr         string // DISCONNECT — non-empty if the disconnect was unclean
 }
 
 // Will captures the Will-message fields from a CONNECT packet so a
@@ -69,11 +70,18 @@ type Broker struct {
 }
 
 // NewBroker spins up a fresh mochi server on a free localhost TCP port,
-// installs an allow-all auth hook, and registers the recorder.
+// installs an allow-all auth hook, and registers the recorder. Used by
+// tests; CLI/harness mode wants NewBrokerAt to bind a known address.
 func NewBroker() (*Broker, error) {
-	// Bind on :0 so the OS picks a free port — this is what lets us run
-	// scenarios in parallel without coordinating port reservations.
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	return NewBrokerAt("127.0.0.1:0")
+}
+
+// NewBrokerAt is NewBroker but binds the listener to the supplied
+// address (host:port). Pass "host:0" to let the OS pick the port.
+func NewBrokerAt(bind string) (*Broker, error) {
+	// Reserve up front so we can echo the resolved address back to the
+	// caller (and so :0 yields a usable port instead of a race).
+	ln, err := net.Listen("tcp", bind)
 	if err != nil {
 		return nil, fmt.Errorf("reserve port: %w", err)
 	}
@@ -83,6 +91,9 @@ func NewBroker() (*Broker, error) {
 	srv := mqtt.New(&mqtt.Options{
 		// Silence server logs; tests can re-enable by replacing srv.Log.
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		// InlineClient lets the harness publish stimuli (e.g. NCMD/Rebirth)
+		// through srv.Publish so scenarios can score the SUT's response.
+		InlineClient: true,
 	})
 	if err := srv.AddHook(new(auth.AllowHook), nil); err != nil {
 		return nil, fmt.Errorf("install auth: %w", err)
@@ -118,8 +129,37 @@ func (b *Broker) Events() []Event {
 	return out
 }
 
+// WaitForDisconnect polls for an EvDisconnect event from clientID, up to
+// timeout. The hook fires asynchronously after Disconnect() returns, so
+// drive code uses this instead of a blind sleep.
+func (b *Broker) WaitForDisconnect(clientID string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for {
+		b.mu.Lock()
+		for _, e := range b.events {
+			if e.Type == EvDisconnect && e.ClientID == clientID {
+				b.mu.Unlock()
+				return true
+			}
+		}
+		b.mu.Unlock()
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 func (b *Broker) Close() error {
 	return b.server.Close()
+}
+
+// Publish injects a message into the broker as if a connected client
+// had sent it. The harness CLI uses this for stimuli (e.g. publishing
+// NCMD/Rebirth at a known instant so the scenario can score the
+// edge's response).
+func (b *Broker) Publish(topic string, payload []byte, retain bool, qos byte) error {
+	return b.server.Publish(topic, payload, retain, qos)
 }
 
 func (b *Broker) record(e Event) {
@@ -153,9 +193,10 @@ func (r *recorder) Init(_ any) error { return nil }
 
 func (r *recorder) OnConnect(cl *mqtt.Client, pk packets.Packet) error {
 	ev := Event{
-		Type:       EvConnect,
-		ClientID:   cl.ID,
-		CleanStart: pk.Connect.Clean,
+		Type:            EvConnect,
+		ClientID:        cl.ID,
+		CleanStart:      pk.Connect.Clean,
+		ProtocolVersion: pk.ProtocolVersion,
 	}
 	if pk.Connect.WillFlag {
 		ev.Will = &Will{

@@ -14,6 +14,97 @@
     "source_line": 63
   },
   {
+    "id": "tck-id-components-ph-state",
+    "text": "A Sparkplug Host Application MUST utilize the STATE messages to denote whether it is online or offline at any given point in time.",
+    "category": "components",
+    "source_file": "Sparkplug_3_Components.adoc",
+    "source_line": 84
+  },
+  {
+    "id": "tck-id-conformance-mqtt-aware-basic",
+    "text": "A Sparkplug Aware MQTT Server MUST support all aspects of a Sparkplug Compliant MQTT Server",
+    "category": "conformance",
+    "source_file": "Sparkplug_10_Conformance.adoc",
+    "source_line": 91
+  },
+  {
+    "id": "tck-id-conformance-mqtt-aware-dbirth-mqtt-retain",
+    "text": "A Sparkplug Aware MQTT Server MUST make DBIRTH messages available on the topic: $sparkplug/certificates/namespace/groupid/DBIRTH/edgenodeid/deviceid with the MQTT retain flag set to true",
+    "category": "conformance",
+    "source_file": "Sparkplug_10_Conformance.adoc",
+    "source_line": 111
+  },
+  {
+    "id": "tck-id-conformance-mqtt-aware-dbirth-mqtt-topic",
+    "text": "A Sparkplug Aware MQTT Server MUST make DBIRTH messages available on a topic of the form: $sparkplug/certificates/namespace/groupid/DBIRTH/edgenodeid/deviceid",
+    "category": "conformance",
+    "source_file": "Sparkplug_10_Conformance.adoc",
+    "source_line": 105
+  },
+  {
+    "id": "tck-id-conformance-mqtt-aware-nbirth-mqtt-retain",
+    "text": "A Sparkplug Aware MQTT Server MUST make NBIRTH messages available on the topic: $sparkplug/certificates/namespace/groupid/NBIRTH/edgenodeid with the MQTT retain flag set to true",
+    "category": "conformance",
+    "source_file": "Sparkplug_10_Conformance.adoc",
+    "source_line": 101
+  },
+  {
+    "id": "tck-id-conformance-mqtt-aware-nbirth-mqtt-topic",
+    "text": "A Sparkplug Aware MQTT Server MUST make NBIRTH messages available on a topic of the form: $sparkplug/certificates/namespace/groupid/NBIRTH/edgenodeid",
+    "category": "conformance",
+    "source_file": "Sparkplug_10_Conformance.adoc",
+    "source_line": 96
+  },
+  {
+    "id": "tck-id-conformance-mqtt-aware-ndeath-timestamp",
+    "text": "A Sparkplug Aware MQTT Server MAY replace the timestmap of NDEATH messages. If it does, it MUST set the timestamp to the UTC time at which it attempts to deliver the NDEATH to subscribed clients",
+    "category": "conformance",
+    "source_file": "Sparkplug_10_Conformance.adoc",
+    "source_line": 115
+  },
+  {
+    "id": "tck-id-conformance-mqtt-aware-store",
+    "text": "A Sparkplug Aware MQTT Server MUST store NBIRTH and DBIRTH messages as they pass through the MQTT Server",
+    "category": "conformance",
+    "source_file": "Sparkplug_10_Conformance.adoc",
+    "source_line": 93
+  },
+  {
+    "id": "tck-id-conformance-mqtt-qos0",
+    "text": "A Sparkplug conformant MQTT Server MUST support publish and subscribe on QoS 0",
+    "category": "conformance",
+    "source_file": "Sparkplug_10_Conformance.adoc",
+    "source_line": 60
+  },
+  {
+    "id": "tck-id-conformance-mqtt-qos1",
+    "text": "A Sparkplug conformant MQTT Server MUST support publish and subscribe on QoS 1",
+    "category": "conformance",
+    "source_file": "Sparkplug_10_Conformance.adoc",
+    "source_line": 62
+  },
+  {
+    "id": "tck-id-conformance-mqtt-retained",
+    "text": "A Sparkplug conformant MQTT Server MUST support all aspects of the 'retain flag'",
+    "category": "conformance",
+    "source_file": "Sparkplug_10_Conformance.adoc",
+    "source_line": 67
+  },
+  {
+    "id": "tck-id-conformance-mqtt-will-messages",
+    "text": "A Sparkplug conformant MQTT Server MUST support all aspects of Will Messages including use of the 'retain flag' and QoS 1",
+    "category": "conformance",
+    "source_file": "Sparkplug_10_Conformance.adoc",
+    "source_line": 64
+  },
+  {
+    "id": "tck-id-conformance-primary-host",
+    "text": "Sparkplug Host Applications MUST publish 'STATE' messages that represent its Birth and Death Certificates.",
+    "category": "conformance",
+    "source_file": "Sparkplug_10_Conformance.adoc",
+    "source_line": 49
+  },
+  {
     "id": "tck-id-host-topic-phid-birth-message",
     "text": "The first MQTT message a Host Application MUST publish is a Birth Certificate.",
     "category": "host",
@@ -124,6 +215,62 @@
     "category": "host",
     "source_file": "Sparkplug_4_Topics.adoc",
     "source_line": 588
+  },
+  {
+    "id": "tck-id-intro-device-id-chars",
+    "text": "Because the Device ID is used in MQTT topic strings the Device ID MUST only contain characters allowed for MQTT topics per the MQTT Specification.",
+    "category": "intro",
+    "source_file": "Sparkplug_1_Introduction.adoc",
+    "source_line": 325
+  },
+  {
+    "id": "tck-id-intro-device-id-string",
+    "text": "The Device ID MUST be a UTF-8 string and used as part of the Sparkplug topics as defined in the link:#topics[Topics Section].",
+    "category": "intro",
+    "source_file": "Sparkplug_1_Introduction.adoc",
+    "source_line": 322
+  },
+  {
+    "id": "tck-id-intro-edge-node-id-chars",
+    "text": "Because the Edge Node ID is used in MQTT topic strings the Edge Node ID MUST only contain characters allowed for MQTT topics per the MQTT Specification.",
+    "category": "intro",
+    "source_file": "Sparkplug_1_Introduction.adoc",
+    "source_line": 316
+  },
+  {
+    "id": "tck-id-intro-edge-node-id-string",
+    "text": "The Edge Node ID MUST be a UTF-8 string and used as part of the Sparkplug topics as defined in the link:#topics[Topics Section].",
+    "category": "intro",
+    "source_file": "Sparkplug_1_Introduction.adoc",
+    "source_line": 313
+  },
+  {
+    "id": "tck-id-intro-edge-node-id-uniqueness",
+    "text": "The Edge Node Descriptor MUST be unique within the context of all of other Edge Nodes within the Sparkplug infrastructure.",
+    "category": "intro",
+    "source_file": "Sparkplug_1_Introduction.adoc",
+    "source_line": 332
+  },
+  {
+    "id": "tck-id-intro-group-id-chars",
+    "text": "Because the Group ID is used in MQTT topic strings the Group ID MUST only contain characters allowed for MQTT topics per the MQTT Specification.",
+    "category": "intro",
+    "source_file": "Sparkplug_1_Introduction.adoc",
+    "source_line": 307
+  },
+  {
+    "id": "tck-id-intro-group-id-string",
+    "text": "The Group ID MUST be a UTF-8 string and used as part of the Sparkplug topics as defined in the link:#topics[Topics Section].",
+    "category": "intro",
+    "source_file": "Sparkplug_1_Introduction.adoc",
+    "source_line": 304
+  },
+  {
+    "id": "tck-id-intro-sparkplug-host-state",
+    "text": "Sparkplug Host Applications MUST publish STATE messages denoting their online and offline status.",
+    "category": "intro",
+    "source_file": "Sparkplug_1_Introduction.adoc",
+    "source_line": 276
   },
   {
     "id": "tck-id-message-flow-device-birth-publish-dbirth-match-edge-node-topic",
@@ -1559,6 +1706,34 @@
     "category": "payloads",
     "source_file": "Sparkplug_6_Payloads.adoc",
     "source_line": 415
+  },
+  {
+    "id": "tck-id-principles-birth-certificates-order",
+    "text": "Birth Certificates MUST be the first MQTT messages published by any Edge Node or any Host Application.",
+    "category": "principles",
+    "source_file": "Sparkplug_2_Principles.adoc",
+    "source_line": 97
+  },
+  {
+    "id": "tck-id-principles-persistence-clean-session-311",
+    "text": "If the MQTT client is using MQTT v3.1.1, the Edge Node's MQTT CONNECT packet MUST set the 'Clean Session' flag to true.",
+    "category": "principles",
+    "source_file": "Sparkplug_2_Principles.adoc",
+    "source_line": 133
+  },
+  {
+    "id": "tck-id-principles-persistence-clean-session-50",
+    "text": "If the MQTT client is using MQTT v5.0, the Edge Node's MQTT CONNECT packet MUST set the 'Clean Start' flag to true and the 'Session Expiry Interval' to 0.",
+    "category": "principles",
+    "source_file": "Sparkplug_2_Principles.adoc",
+    "source_line": 136
+  },
+  {
+    "id": "tck-id-principles-rbe-recommended",
+    "text": "Because of the stateful nature of Sparkplug sessions, data SHOULD NOT be published from Edge Nodes on a periodic basis and instead SHOULD be published using a RBE based approach.",
+    "category": "principles",
+    "source_file": "Sparkplug_2_Principles.adoc",
+    "source_line": 50
   },
   {
     "id": "tck-id-topic-structure",

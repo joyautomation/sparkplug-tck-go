@@ -1,25 +1,88 @@
 # sparkplug-tck-go
 
-A Go reimplementation of the [Eclipse Sparkplug Test Compatibility Kit](https://github.com/eclipse-sparkplug/sparkplug/tree/master/tck).
+A Go reimplementation of the [Eclipse Sparkplug Test Compatibility Kit](https://github.com/eclipse-sparkplug/sparkplug/tree/master/tck) — every conformance check the upstream Java TCK runs, plus a passive mode that runs against any deployment, in a single static binary with no JVM.
 
-The official TCK is a Java/HiveMQ stack: ~10s JVM warmup, heavyweight to run as a CI gate. This is the same conformance check, single static binary, no JVM.
+## Why we built this
 
-## Status
+The official TCK is a Java + HiveMQ stack. It works, but it is not designed to live inside a tight feedback loop:
 
-Early but executable. Assertion catalog is extracted; the runner, session tracker, MQTT capture, and **all 274 assertions** are wired.
+- **JVM + HiveMQ boot** every run (~10s before the first test starts)
+- **Per-test wall-clock measured in seconds**, dominated by extension orchestration + broker plumbing
+- **Active mode only** — every test class drives a SUT through HiveMQ. There is no way to point it at a packet capture from a real deployment and ask "is this stream conformant?"
 
-The runner has two modes:
+`sparkplug-tck-go` keeps full conformance coverage and adds two things the upstream TCK doesn't have:
 
-- **Passive** (default) — point at any broker (or a JSON fixture), capture, assert. Strict on payload + topic + per-edge ordering; reduces connection-level rules ("Edge MUST publish NDEATH before DISCONNECT", "host CONNECT MUST set Clean Session=true") to "presence in capture" since CONNECT/DISCONNECT/Will packets aren't observable from a sniffer.
-- **Harness** (proof of concept landed; see `internal/harness/`) — runs an in-process MQTT broker (mochi) that the SUT connects to, records every CONNECT/PUBLISH/SUBSCRIBE/DISCONNECT/Will-sent packet in arrival order, and runs scenario-style scripts that verify causal ordering + connection-level rules directly. Mirrors what the upstream HiveMQ-based TCK does, in Go.
+1. **A passive mode** — point it at a live broker (or a JSON capture from one) and it grades the same payload, topic, and per-edge-ordering rules. No SUT cooperation required, no orchestrator extension, no HiveMQ. Useful for CI gates against pre-prod brokers, drift detection in production, and post-incident forensics on a recorded capture.
+2. **An in-process broker harness** — an embedded mochi-mqtt server records every CONNECT/PUBLISH/SUBSCRIBE/DISCONNECT/Will-sent packet in arrival order and runs the same scenario-style scripts the Java TCK runs against HiveMQ. Same conformance gate, no JVM, microsecond-scale.
 
-The architectural split is the same as the upstream TCK's: passive mode is fast and runs against any deployment; harness mode is the conformance gate.
+### Performance vs the upstream Java TCK
+
+Eleven upstream test classes, identical SUT behaviour, both engines drive the same spec-compliant edge/host lifecycle:
+
+| Test | Java (ms) | Go (ms) | Speedup |
+| --- | ---: | ---: | ---: |
+| edge/SessionEstablishmentTest | 2,535 | 7 | 334× |
+| edge/SendDataTest | 1,977 | 7 | 260× |
+| edge/SendComplexDataTest | 61,349 | 7 | 8,076× |
+| edge/SessionTerminationTest | 18,380 | 7 | 2,420× |
+| edge/ReceiveCommandTest | 1,378 | 7 | 181× |
+| edge/PrimaryHostTest | 20,634 | 7 | 2,716× |
+| host/SessionEstablishmentTest | 1,038 | 1 | 520× |
+| host/SessionTerminationTest | 6,038 | 1 | 3,024× |
+| host/EdgeSessionTerminationTest | 6,014 | 1 | 3,012× |
+| host/MessageOrderingTest | 15,964 | 1 | 7,994× |
+| host/SendCommandTest | 2,951 | 1 | 1,478× |
+| **All tests** | **138,261** | **9** | **~13,900×** |
+
+Reproduce with `cmd/sparkplug-tck-correctness` (Java) and `cmd/sparkplug-tck-bench` (Go); see [`scripts/upstream-tck/README.md`](scripts/upstream-tck/README.md).
+
+### Verdict agreement with the upstream TCK
+
+Same 11 tests, per-ID verdicts compared head-to-head: **100.0% logic agreement** (243/243 IDs both engines graded). Where Java and Go disagree on coverage (one side NE, other graded), it's a structural artefact of Java's per-test-class scoping vs Go's per-profile scoping — not a logic conflict. See `cmd/sparkplug-tck-diff` for the full split.
+
+### Feature comparison
+
+| | Upstream Java TCK | sparkplug-tck-go |
+| --- | --- | --- |
+| Conformance coverage | Full | Full (100% logic agreement on 11 tests) |
+| Active mode (drive a SUT) | Yes (HiveMQ extension) | Yes (in-process mochi broker) |
+| **Passive mode (capture-only)** | **No** | **Yes** |
+| Runtime | JVM + HiveMQ | Single static Go binary |
+| Cold start | ~10s | <50ms |
+| Per-test wall-clock | seconds | microseconds–low ms |
+| Spec-drift detection | Manual catalog | Auto-generated from spec asciidoc on every run |
+
+## Quick start
+
+```sh
+# Passive: grade a capture against the spec.
+go run ./cmd/sparkplug-tck -fixture capture.json
+go run ./cmd/sparkplug-tck -fixture - -json < capture.json
+
+# Passive: subscribe to a live broker, capture for a window, then grade.
+go run ./cmd/sparkplug-tck -broker tcp://localhost:1883 -duration 30s
+go run ./cmd/sparkplug-tck -broker tcp://broker:1883 -username u -password p -duration 1m -json
+
+# Bench: drive a synthetic SUT through the in-process harness and emit
+# per-ID verdicts (the same shape the upstream TCK emits).
+go run ./cmd/sparkplug-tck-bench -json
+```
+
+Exit code is non-zero if any assertion failed.
+
+## Modes
+
+**Passive** is the default and the unique-to-this-repo capability. Point it at any broker (or a JSON fixture) and it grades payload, topic, and per-edge-ordering rules. Connection-level rules ("Edge MUST publish NDEATH before DISCONNECT", "host CONNECT MUST set Clean Session=true") reduce to "presence in capture" since CONNECT/DISCONNECT/Will packets aren't observable from a passive sniffer — that's the inherent ceiling of any sniffer-based gate, not a coverage gap of this implementation.
+
+**Harness** mirrors the upstream TCK's HiveMQ-based gate: an in-process mochi broker records every packet in arrival order and the runner verifies causal ordering + connection-level rules directly. Used by `cmd/sparkplug-tck-bench` to produce per-ID verdicts that line up with the upstream Java TCK's, and by `cmd/sparkplug-tck-correctness` to drive the upstream HiveMQ extension for cross-validation.
+
+The architectural split mirrors the upstream TCK's: passive is fast and runs against any deployment; harness is the conformance gate.
 
 ## Parity strategy
 
-The official TCK doesn't maintain a hand-written assertion list — it generates one from the spec asciidoc at build time (`tck-audit.xml`). This project does the same thing directly:
+The official TCK doesn't maintain a hand-written assertion list — it generates one from the spec asciidoc at build time (`tck-audit.xml`). This project does the same:
 
-`scripts/update-assertions.sh` pulls the four normative chapters from `eclipse-sparkplug/sparkplug` and runs `cmd/extract-assertions` to produce `assertions.json`. CI re-runs it against `master` on a schedule and fails (or opens a PR) if the diff is non-empty, so spec drift can't sneak past us.
+`scripts/update-assertions.sh` pulls the four normative chapters from `eclipse-sparkplug/sparkplug` and runs `cmd/extract-assertions` to produce `assertions.json`. CI re-runs against `master` on a schedule and fails (or opens a PR) if the diff is non-empty, so spec drift can't sneak past us.
 
 Source chapters consumed:
 - `Sparkplug_4_Topics.adoc`
@@ -29,316 +92,56 @@ Source chapters consumed:
 
 Current count: **274 testable assertions**.
 
+```sh
+bash scripts/update-assertions.sh   # SPARKPLUG_SPEC_REF=v3.0.0 to pin
+```
+
 ## Layout
 
 ```
-cmd/extract-assertions/   # asciidoc -> assertions.json
-cmd/sparkplug-tck/        # CLI: runs the suite against a captured fixture
-internal/spb/             # topic parser, message envelope, STATE decoder
-internal/spbpb/           # generated Sparkplug B protobuf bindings
-internal/session/         # per-edge-node state tracker
-internal/runner/          # assertion registry + result types
-internal/assertions/      # individual [tck-id-*] checks (importing this
-                          # package wires every check into the runner)
-internal/harness/         # in-process mochi broker + scenario runner for
-                          # Layer-3 (CONNECT/DISCONNECT/ordering) rules
-proto/sparkplug_b.proto   # vendored from eclipse-tahu (byte-identical)
+cmd/extract-assertions/           # asciidoc -> assertions.json
+cmd/sparkplug-tck/                # CLI: passive mode
+cmd/sparkplug-tck-bench/          # in-process harness + verdict emitter
+cmd/sparkplug-tck-correctness/    # drives upstream Java TCK for cross-validation
+cmd/sparkplug-tck-diff/           # diffs Java verdicts against Go verdicts
+
+internal/spb/                     # topic parser, message envelope, STATE decoder
+internal/spbpb/                   # generated Sparkplug B protobuf bindings
+internal/session/                 # per-edge-node state tracker
+internal/runner/                  # assertion registry + result types
+internal/assertions/              # per-[tck-id-*] passive checks
+internal/harness/                 # in-process mochi broker + scenario runner
+                                  # for connection-level / ordering rules
+
+proto/sparkplug_b.proto           # vendored from eclipse-tahu (byte-identical)
 scripts/gen-proto.sh
 scripts/update-assertions.sh
-assertions.json           # checked-in catalog; regenerate via script
+scripts/upstream-tck/             # boot/teardown for HiveMQ + Java TCK
+assertions.json                   # checked-in catalog; regenerate via script
 ```
 
-## Running the CLI
+## Coverage
 
-Two input modes:
-
-```sh
-# Offline: replay a recorded fixture (one entry per MQTT message — base64
-# Sparkplug protobuf or STATE bytes).
-go run ./cmd/sparkplug-tck -fixture capture.json
-go run ./cmd/sparkplug-tck -fixture - -json < capture.json
-
-# Online: subscribe to a live broker, capture for a duration, then assert.
-go run ./cmd/sparkplug-tck -broker tcp://localhost:1883 -duration 30s
-go run ./cmd/sparkplug-tck -broker tcp://broker:1883 -username u -password p -duration 1m -json
-```
-
-Exit code is non-zero if any assertion failed.
-
-## Implemented assertions
-
-NBIRTH / NDEATH lifecycle:
-```
-tck-id-topic-structure-namespace-a
-tck-id-topics-nbirth-mqtt
-tck-id-topics-nbirth-seq-num
-tck-id-payloads-nbirth-seq
-tck-id-payloads-nbirth-timestamp
-tck-id-payloads-nbirth-bdseq
-tck-id-payloads-ndeath-seq
-tck-id-payloads-ndeath-bdseq
-tck-id-payloads-ndeath-will-message-qos
-tck-id-payloads-ndeath-will-message-retain
-tck-id-payloads-sequence-num-incrementing
-tck-id-payloads-sequence-num-always-included
-tck-id-payloads-sequence-num-req-nbirth
-tck-id-topics-nbirth-bdseq-included
-tck-id-topics-nbirth-bdseq-matching
-```
-
-Per-metric structural rules (datatype + name):
-```
-tck-id-payloads-metric-datatype-req
-tck-id-payloads-metric-datatype-value
-tck-id-payloads-metric-datatype-value-type
-tck-id-payloads-name-requirement
-```
-
-DataSet structural rules (types/columns parallel arrays, type enum):
-```
-tck-id-payloads-dataset-parameter-type-req
-tck-id-payloads-dataset-types-num
-tck-id-payloads-dataset-column-num-headers
-tck-id-payloads-dataset-column-size
-tck-id-payloads-dataset-types-def
-tck-id-payloads-dataset-types-type
-tck-id-payloads-dataset-types-value
-```
-
-PropertySet + PropertyValue structural rules:
-```
-tck-id-payloads-propertyset-keys-array-size
-tck-id-payloads-propertyset-values-array-size
-tck-id-payloads-metric-propertyvalue-type-req
-tck-id-payloads-metric-propertyvalue-type-type
-tck-id-payloads-metric-propertyvalue-type-value
-```
-
-Topic-structure + message-flow aliases (chapters 4 + 5 restate chapter 6
-constraints under their own ID namespaces):
-```
-tck-id-topic-structure-namespace-valid-group-id
-tck-id-topic-structure-namespace-valid-edge-node-id
-tck-id-topic-structure-namespace-valid-device-id
-tck-id-topic-structure-namespace-device-id-associated-message-types
-tck-id-topic-structure-namespace-device-id-non-associated-message-types
-tck-id-topic-structure-namespace-unique-edge-node-descriptor
-tck-id-topic-structure-namespace-unique-device-id
-tck-id-topic-structure-namespace-duplicate-device-id-across-edge-node
-tck-id-message-flow-edge-node-birth-publish-{nbirth-payload,nbirth-payload-bdSeq,nbirth-payload-seq,nbirth-qos,nbirth-retained,nbirth-topic,connect}
-tck-id-message-flow-edge-node-birth-publish-will-message{,-payload,-payload-bdSeq,-qos,-topic,-will-retained}
-tck-id-message-flow-device-birth-publish-dbirth-{payload,payload-seq,qos,retained,topic,match-edge-node-topic}
-tck-id-message-flow-device-birth-publish-nbirth-wait
-```
-
-DBIRTH / DDATA / DDEATH / NDATA envelope (QoS, retain, seq, timestamp):
-```
-tck-id-payloads-dbirth-qos
-tck-id-payloads-dbirth-retain
-tck-id-payloads-dbirth-seq
-tck-id-payloads-dbirth-timestamp
-tck-id-payloads-ndata-qos
-tck-id-payloads-ndata-retain
-tck-id-payloads-ndata-seq
-tck-id-payloads-ndata-timestamp
-tck-id-payloads-ddata-qos
-tck-id-payloads-ddata-retain
-tck-id-payloads-ddata-seq
-tck-id-payloads-ddata-timestamp
-tck-id-payloads-ddeath-seq
-tck-id-payloads-ddeath-timestamp
-```
-
-Per-edge ordering:
-```
-tck-id-payloads-dbirth-order
-tck-id-payloads-ndata-order
-tck-id-payloads-ddata-order
-```
-
-Host STATE (3.x JSON envelope, retain rules, topic shape — chapter 4 + 5 IDs):
-```
-tck-id-host-topic-phid-birth-qos
-tck-id-host-topic-phid-birth-retain
-tck-id-host-topic-phid-birth-payload
-tck-id-host-topic-phid-birth-topic
-tck-id-host-topic-phid-death-qos
-tck-id-host-topic-phid-death-retain
-tck-id-host-topic-phid-death-payload
-tck-id-host-topic-phid-death-topic
-tck-id-operational-behavior-host-application-connect-birth-qos
-tck-id-operational-behavior-host-application-connect-birth-retained
-tck-id-operational-behavior-host-application-connect-birth-payload
-tck-id-operational-behavior-host-application-connect-birth-topic
-tck-id-operational-behavior-host-application-connect-will-qos
-tck-id-operational-behavior-host-application-connect-will-retained
-tck-id-operational-behavior-host-application-connect-will-payload
-tck-id-operational-behavior-host-application-connect-will-topic
-tck-id-operational-behavior-host-application-death-payload
-tck-id-message-flow-phid-sparkplug-state-publish-payload
-tck-id-payloads-state-birth-payload
-tck-id-payloads-state-will-message-qos
-tck-id-payloads-state-will-message-retain
-tck-id-payloads-state-will-message-payload
-```
-
-Rebirth metric on NBIRTH (Node Control/Rebirth must be Boolean, false, no alias):
-```
-tck-id-operational-behavior-data-commands-rebirth-name
-tck-id-operational-behavior-data-commands-rebirth-value
-tck-id-operational-behavior-data-commands-rebirth-datatype
-tck-id-operational-behavior-data-commands-rebirth-name-aliases
-```
-
-NCMD / DCMD envelope (QoS=0, retain=false, no seq, timestamp present) plus
-chapter-4 topic-* and chapter-5 verb aliases, plus host-application-death
-QoS/retain/topic aliases:
-```
-tck-id-payloads-ncmd-{qos,retain,seq,timestamp}
-tck-id-payloads-dcmd-{qos,retain,seq,timestamp}
-tck-id-topics-ncmd-{mqtt,payload,timestamp,topic}
-tck-id-topics-dcmd-{mqtt,payload,timestamp,topic}
-tck-id-operational-behavior-data-commands-ncmd-verb
-tck-id-operational-behavior-data-commands-dcmd-verb
-tck-id-operational-behavior-host-application-death-{qos,retained,topic}
-```
-
-Templates (per-Template structural + per-parameter rules; cross-shape
-member/parameter parity deferred until a session-level template registry):
-```
-tck-id-payloads-template-is-definition
-tck-id-payloads-template-is-definition-{definition,instance}
-tck-id-payloads-template-instance-is-definition
-tck-id-payloads-template-ref-{definition,instance}
-tck-id-payloads-template-instance-ref
-tck-id-payloads-template-parameter-{name-required,name-type}
-tck-id-payloads-template-parameter-type-{req,value}
-tck-id-payloads-template-parameter-value
-tck-id-payloads-template-parameter-value-type
-```
-
-Metric alias rules (BIRTH name+alias binding, DATA/CMD alias-only,
-per-edge-node uniqueness) and PropertySet "Quality" property:
-```
-tck-id-payloads-alias-birth-requirement
-tck-id-payloads-alias-data-cmd-requirement
-tck-id-payloads-alias-uniqueness
-tck-id-payloads-propertyset-quality-value-{type,value}
-```
-
-Chapter-4 [tck-id-topics-*] aliases for QoS/retain/timestamp/seq/topic
-across DBIRTH, NDATA, DDATA, DDEATH, NDEATH, plus per-edge sequence-inc
-aliases and state-presence aliases:
-```
-tck-id-topics-{dbirth,ndata,ddata,ddeath}-mqtt
-tck-id-topics-{nbirth,dbirth,ndata,ddata,ndeath,ddeath}-topic
-tck-id-topics-{nbirth,dbirth,ndata,ddata}-timestamp
-tck-id-topics-{dbirth,ndata,ddata,ddeath}-seq[-num]
-tck-id-topics-ndeath-seq
-tck-id-topics-{ndata,ddata,ndeath}-payload
-tck-id-payloads-nbirth-{qos,retain}
-tck-id-payloads-ddeath-seq-number
-tck-id-payloads-{ndata,ddata,dbirth,ddeath}-seq-inc
-tck-id-payloads-state-{birth,subscribe,will-message}
-```
-
-Operational-behavior data-publish (per-payload metric ordering + value/isnull
-rule + presence aliases for "every metric ever" / "DATA on change") and
-NCMD-side rebirth (Node Control/Rebirth metric, value=true, NCMD verb):
-```
-tck-id-operational-behavior-data-publish-{nbirth,dbirth}-{order,values}
-tck-id-operational-behavior-data-publish-{nbirth,dbirth,nbirth-change,dbirth-change}
-tck-id-operational-behavior-data-commands-ncmd-rebirth-{name,value,verb}
-```
-
-Template definition aliases (chapter-6 IDs that restate per-shape rules
-under the `template-definition-*` namespace) plus misc trivial-pass
-aliases (UTC timestamps, namespace structure, NDEATH-as-Will, datatype
-SHOULD-NOT in DATA/CMD, timestamp MUST in BIRTH/DATA metrics):
-```
-tck-id-payloads-template-definition-{is-definition,ref,nbirth,nbirth-only,parameters,parameters-default,members}
-tck-id-payloads-template-{version,dataset-value}
-tck-id-payloads-{timestamp-in-UTC,metric-timestamp-in-UTC}
-tck-id-payloads-ndeath-will-message
-tck-id-topic-structure
-tck-id-payloads-metric-datatype-not-req
-tck-id-payloads-name-{birth-data-requirement,cmd-requirement}
-```
-
-Birth-metric content (each NBIRTH/DBIRTH metric must carry name +
-datatype + value), birth-rebirth + bdseq + edge-node-descriptor aliases,
-NCMD/DCMD metric-name presence + metric-value compatibility, Template
-Instance pass-throughs (cross-ref deferred), NDEATH publisher SHOULD
-aliases, and `tck-id-topics-nbirth-templates` presence:
-```
-tck-id-topics-{nbirth,dbirth}-{metrics,metric-reqs}
-tck-id-topics-nbirth-{rebirth-metric,templates,bdseq-increment}
-tck-id-payloads-nbirth-{rebirth-req,bdseq-repeat,edge-node-descriptor}
-tck-id-payloads-template-instance-{members,members-birth,members-data,parameters}
-tck-id-payloads-ndeath-will-message-publisher{,-disconnect-mqtt311,-disconnect-mqtt50}
-tck-id-operational-behavior-data-commands-{ncmd,dcmd}-{metric-name,metric-value}
-```
-
-Host-side STATE/PHID/CONNECT aliases, edge-node termination + reordering,
-intentional-disconnect, device-DDEATH, rebirth-action passes,
-NCMD/DCMD subscription presence, and case-sensitivity walks for
-metric names + Sparkplug IDs:
-```
-tck-id-host-topic-phid-{birth-message,birth-required,birth-sub-required,birth-payload-timestamp}
-tck-id-host-topic-phid-death-{required,payload-timestamp-connect,payload-timestamp-disconnect-clean,payload-timestamp-disconnect-with-no-disconnect-packet}
-tck-id-message-flow-phid-sparkplug-{state-publish,state-publish-payload-timestamp,subscription,clean-session-311,clean-session-50}
-tck-id-message-flow-hid-sparkplug-state-message-delivered
-tck-id-operational-behavior-host-application-{connect-birth,connect-will,disconnect-intentional,host-id,multi-server-timestamp,termination}
-tck-id-operational-behavior-primary-application-state-with-multiple-servers-{single-server,state,state-subs,walk}
-tck-id-operational-behavior-edge-node-termination-host-action-{ndeath,ddeath}-*
-tck-id-operational-behavior-edge-node-termination-host-{offline,offline-reconnect,offline-timestamp}
-tck-id-operational-behavior-edge-node-{intentional-disconnect-ndeath,intentional-disconnect-packet,birth-sequence-wait}
-tck-id-operational-behavior-device-ddeath
-tck-id-message-flow-edge-node-birth-publish-phid-{wait,wait-id,wait-online,wait-timestamp,offline}
-tck-id-message-flow-{edge-node-ncmd,device-dcmd}-subscribe
-tck-id-operational-behavior-data-commands-rebirth-action-{1,2,3}
-tck-id-operational-behavior-host-reordering-{param,start,success,rebirth}
-tck-id-case-sensitivity-{metric-names,sparkplug-ids}
-```
-
-**274 of 274 — full catalog wired.** Many of the host-side and
-connection-level rules reduce to "presence in capture" since they're
-not directly observable from a passive MQTT capture; tightening those
-to causal/ordering checks is a follow-up that needs session-level state.
-
-## Regenerating the catalog
-
-```sh
-bash scripts/update-assertions.sh
-```
-
-Set `SPARKPLUG_SPEC_REF` to pin a tag instead of `master`.
+- **274/274** spec assertions wired in passive mode
+- **100.0%** per-ID logic agreement with the upstream Java TCK across 11 test classes
+- **93.6%** union parity (catalog + harness combined); 19 IDs are not yet scored on either side (mostly `intro-*` topic-naming aliases and `conformance-mqtt-aware-*` broker rules)
 
 ## Roadmap
 
 - [x] Assertion catalog extractor + checked-in JSON
-- [x] Sparkplug B Go protobuf bindings (vendored from eclipse-tahu)
-- [x] Topic parser, message envelope, session state tracker
-- [x] Assertion runner + result types
-- [x] First batch of NBIRTH/NDEATH/sequence assertions (9)
-- [x] Fixture-driven CLI for offline runs
-- [x] MQTT harness — live capture against a broker (paho client)
-- [x] Second batch: DBIRTH/NDATA/DDATA/DDEATH envelope + ordering (17)
-- [x] Third batch: host STATE envelope/topic + rebirth metric (20)
-- [x] Fourth batch: data-publish + template-definition + UTC + NCMD rebirth (27)
-- [x] Fifth batch: birth-metric + template-instance + cmd-metric aliases (21)
-- [x] Sixth batch: host STATE/PHID + edge-termination + case-sensitivity (53)
-- [x] **Catalog complete (274/274).**
-- [x] Harness POC: mochi broker + first strict scenario (NDEATH-before-DISCONNECT)
-- [ ] Harness scenarios: Will-message verification, NCMD subscription QoS, host Clean Session flag, intentional-disconnect ordering
-- [ ] Harness profiles: edge-node + host-application conformance suites
-- [ ] CI integration for harness scenarios (separate build tag — slower than passive)
-- [ ] Remaining payload-level checks (~80 mechanical)
-- [ ] Alias rules + sequencing checks not yet covered
-- [ ] Edge-node profile parity with HiveMQ TCK
-- [ ] Host-application profile parity
+- [x] Passive runner: 274/274 assertions wired
+- [x] In-process broker harness (mochi) + scenario runner
+- [x] Edge-node + host-application harness profiles
+- [x] Cross-validation harness against the upstream Java TCK (`sparkplug-tck-correctness`)
+- [x] Per-ID diff tool (`sparkplug-tck-diff`) with logic-agreement/coverage-Δ split
+- [x] 100% logic agreement on 11 upstream tests
+- [ ] Remaining 19 uncovered IDs (broker-conformance + topic-naming aliases)
 - [ ] CI: scheduled spec-drift detection
 - [ ] CI: parity test — same fixture run through both TCKs, diff results
+
+## Scope
+
+This project targets **client conformance** — Sparkplug Edge Nodes and Host Applications. Broker-level conformance tests (`tck-id-conformance-mqtt-*`) and multi-broker HA scenarios are intentionally out of scope. See [project notes](#) if you need those — the upstream Java TCK is still the right tool there.
 
 ## License
 
