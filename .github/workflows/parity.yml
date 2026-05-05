@@ -57,13 +57,21 @@ jobs:
           agree = o.get('agree', 0)
           coverage = o.get('coverage', 0)
           pct = float(o.get('logic_agreement_pct', 0))
+          tests = d.get('tests') or []
+          infra = [t['test'] for t in tests if t.get('overall') == 'INFRA_FAILED']
+          ok = [t for t in tests if t.get('overall') != 'INFRA_FAILED']
           print(f"agree={agree} conflict={conflicts} coverage={coverage} logic_agreement={pct:.1f}%")
+          print(f"tests: {len(ok)} graded, {len(infra)} infra-failed: {infra}")
           # Fail on any logic conflict. Coverage Δ is fine — it's the
           # per-test/per-profile scoping artefact, not a real disagreement.
           if conflicts > 0:
               sys.exit(f"{conflicts} logic conflict(s) — see diff.json artefact")
           if pct < 99.0:
               sys.exit(f"logic agreement {pct:.1f}% < floor 99%")
+          # Tolerate up to 2 infra failures (HiveMQ flakes mid-sweep). More
+          # than that means the env is wedged — fail so we notice.
+          if len(infra) > 2:
+              sys.exit(f"{len(infra)} infra-failed tests, likely env wedged: {infra}")
           PY
 
       - name: Tear down HiveMQ

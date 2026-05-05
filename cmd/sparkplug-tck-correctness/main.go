@@ -170,7 +170,20 @@ func main() {
 
 		testStart := time.Now()
 		if err := ctrl.startTest(profile, testName, args); err != nil {
-			fail("start %s: %v", spec, err)
+			// HiveMQ's persistence/queue can wedge mid-sweep — the next
+			// NEW_TEST publish then fails its QoS1 ack. Don't kill the
+			// whole sweep over one infra hiccup: emit an INFRA_FAILED
+			// report, drop the host driver if any, and try the next test.
+			fmt.Fprintf(os.Stderr, "%s — start failed: %v (continuing)\n", spec, err)
+			if preStartedHost != nil {
+				preStartedHost.stop()
+			}
+			reports = append(reports, report{
+				Test:        profile + "/" + testName,
+				Overall:     "INFRA_FAILED",
+				WallclockUS: time.Since(testStart).Microseconds(),
+			})
+			continue
 		}
 		go driver()
 
