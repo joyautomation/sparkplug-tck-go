@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - run: go vet ./...
+      - run: go build ./...
+      - run: go test -race -count=1 ./...
+
+      - name: Bench parity floor
+        run: |
+          go run ./cmd/sparkplug-tck-bench -json > bench.json
+          python3 - <<'PY'
+          import json, sys
+          d = json.load(open('bench.json'))
+          # Floor below current parity so flake doesn't break CI; raise as
+          # we close the remaining 19 uncovered IDs.
+          floor_union = 0.93
+          floor_upstream = 0.92
+          union = d['union_ids'] / d['catalog_total']
+          tests = d.get('upstream_tests') or []
+          total = sum(t['ids'] for t in tests)
+          hit = sum(t['harness_hit'] for t in tests)
+          upstream = hit / total if total else 1.0
+          print(f"union={union:.3f} upstream={upstream:.3f}")
+          if union < floor_union:
+              sys.exit(f"union parity {union:.3f} < floor {floor_union}")
+          if upstream < floor_upstream:
+              sys.exit(f"upstream parity {upstream:.3f} < floor {floor_upstream}")
+          PY
