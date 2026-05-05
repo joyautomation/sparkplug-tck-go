@@ -208,12 +208,21 @@ func HostCleanSession(b *Broker) []runner.Result {
 			continue
 		}
 		subj := e.ClientID
-		for _, id := range []string{id311, id50} {
+		// Java grades the 311 vs 50 variants by protocol version; the
+		// non-matching ID stays NOT_EXECUTED rather than mirroring PASS.
+		isMQTT5 := e.ProtocolVersion == 5
+		cleanResult := func(id string) runner.Result {
 			if !e.CleanStart {
-				out = append(out, runner.Fail(id, subj, "host CONNECT Clean flag = false, must be true"))
-			} else {
-				out = append(out, runner.Pass(id, subj))
+				return runner.Fail(id, subj, "host CONNECT Clean flag = false, must be true")
 			}
+			return runner.Pass(id, subj)
+		}
+		if isMQTT5 {
+			out = append(out, runner.NA(id311, "host connected MQTT 5; 3.1.1 Clean Session check NA"))
+			out = append(out, cleanResult(id50))
+		} else {
+			out = append(out, cleanResult(id311))
+			out = append(out, runner.NA(id50, "host connected MQTT 3.1.1; MQTT 5 Clean Start check NA"))
 		}
 	}
 	if len(out) == 0 {

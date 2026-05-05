@@ -32,7 +32,8 @@ func NDEATHBeforeDisconnect(b *Broker) []runner.Result {
 	allIDs := []string{idBase, idPacket, idShould, idMqtt311, idMqtt50}
 
 	type lifecycle struct {
-		ndeath, disconnect int // event indices; -1 if not seen
+		ndeath, disconnect int  // event indices; -1 if not seen
+		mqtt5              bool // CONNECT was MQTT 5
 	}
 	byClient := map[string]*lifecycle{}
 	for i, e := range b.Events() {
@@ -42,6 +43,8 @@ func NDEATHBeforeDisconnect(b *Broker) []runner.Result {
 			byClient[e.ClientID] = lc
 		}
 		switch {
+		case e.Type == EvConnect:
+			lc.mqtt5 = e.ProtocolVersion == 5
 		case e.Type == EvPublish && isNDEATHTopic(e.Topic):
 			if lc.ndeath == -1 {
 				lc.ndeath = i
@@ -57,23 +60,35 @@ func NDEATHBeforeDisconnect(b *Broker) []runner.Result {
 			// SUT never disconnected — nothing to assert against.
 			continue
 		}
+		// Java grades the mqtt311/mqtt50 IDs only for the protocol the SUT
+		// actually used; the other variant stays NOT_EXECUTED. Mirror that.
+		coreIDs := []string{idBase, idPacket, idShould}
+		var versionID, otherID string
+		if lc.mqtt5 {
+			versionID, otherID = idMqtt50, idMqtt311
+		} else {
+			versionID, otherID = idMqtt311, idMqtt50
+		}
+		ids := append(append([]string{}, coreIDs...), versionID)
 		switch {
 		case lc.ndeath == -1:
-			for _, id := range allIDs {
+			for _, id := range ids {
 				out = append(out, runner.Fail(id, client,
 					"DISCONNECT observed but no NDEATH was published first"))
 			}
 		case lc.ndeath > lc.disconnect:
 			detail := fmt.Sprintf("NDEATH at event #%d came after DISCONNECT at event #%d",
 				lc.ndeath, lc.disconnect)
-			for _, id := range allIDs {
+			for _, id := range ids {
 				out = append(out, runner.Fail(id, client, detail))
 			}
 		default:
-			for _, id := range allIDs {
+			for _, id := range ids {
 				out = append(out, runner.Pass(id, client))
 			}
 		}
+		out = append(out, runner.NA(otherID,
+			"client used the other MQTT version; this protocol-specific check NA"))
 	}
 	if len(out) == 0 {
 		na := "no DISCONNECT observed in scenario"

@@ -214,8 +214,11 @@ func EdgeSeqAlwaysIncluded(b *Broker) []runner.Result {
 		}
 		// NDEATH has its own rule; isSpBSeqTopic already excludes it from
 		// "must include seq" set per scenarios_birth.go but be explicit.
+		// NCMD/DCMD are commands and per spec MAY omit seq — Java's TCK
+		// scores sequence-num-always-included PASS even when NCMD is sent
+		// without one, so don't FAIL them here either.
 		parts := strings.Split(e.Topic, "/")
-		if len(parts) >= 3 && parts[2] == "NDEATH" {
+		if len(parts) >= 3 && (parts[2] == "NDEATH" || parts[2] == "NCMD" || parts[2] == "DCMD") {
 			continue
 		}
 		scored = true

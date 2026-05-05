@@ -36,16 +36,17 @@ const (
 // Event is one packet observed by the broker. Scenarios consume an
 // ordered slice of these to verify causality across the connection.
 type Event struct {
-	At         time.Time
-	Type       EventType
-	ClientID   string
-	Topic      string  // PUBLISH, WILL_SENT, SUBSCRIBE
-	QoS        byte    // PUBLISH, SUBSCRIBE, WILL
-	Retained   bool    // PUBLISH, WILL
-	CleanStart bool    // CONNECT (3.1.1: Clean Session, 5.0: Clean Start)
-	Will       *Will   // CONNECT
-	Payload    []byte  // PUBLISH, WILL_SENT
-	DiscErr    string  // DISCONNECT — non-empty if the disconnect was unclean
+	At              time.Time
+	Type            EventType
+	ClientID        string
+	Topic           string // PUBLISH, WILL_SENT, SUBSCRIBE
+	QoS             byte   // PUBLISH, SUBSCRIBE, WILL
+	Retained        bool   // PUBLISH, WILL
+	CleanStart      bool   // CONNECT (3.1.1: Clean Session, 5.0: Clean Start)
+	ProtocolVersion byte   // CONNECT — 4 = MQTT 3.1.1, 5 = MQTT 5
+	Will            *Will  // CONNECT
+	Payload         []byte // PUBLISH, WILL_SENT
+	DiscErr         string // DISCONNECT — non-empty if the disconnect was unclean
 }
 
 // Will captures the Will-message fields from a CONNECT packet so a
@@ -171,9 +172,10 @@ func (r *recorder) Init(_ any) error { return nil }
 
 func (r *recorder) OnConnect(cl *mqtt.Client, pk packets.Packet) error {
 	ev := Event{
-		Type:       EvConnect,
-		ClientID:   cl.ID,
-		CleanStart: pk.Connect.Clean,
+		Type:            EvConnect,
+		ClientID:        cl.ID,
+		CleanStart:      pk.Connect.Clean,
+		ProtocolVersion: pk.ProtocolVersion,
 	}
 	if pk.Connect.WillFlag {
 		ev.Will = &Will{

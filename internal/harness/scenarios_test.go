@@ -52,10 +52,24 @@ func TestNDEATHBeforeDisconnect_Compliant(t *testing.T) {
 	if len(res) == 0 {
 		t.Fatalf("expected at least one result, got none")
 	}
+	passCount, naCount := 0, 0
 	for _, r := range res {
-		if r.Status != runner.StatusPass {
-			t.Fatalf("expected all pass, got %+v", res)
+		switch r.Status {
+		case runner.StatusPass:
+			passCount++
+		case runner.StatusNotApplicable:
+			// The mqtt311/mqtt50 IDs are protocol-specific; the variant the
+			// SUT didn't use is intentionally NA.
+			naCount++
+		default:
+			t.Fatalf("expected pass/n_a, got %+v", res)
 		}
+	}
+	if passCount == 0 {
+		t.Fatalf("expected at least one pass, got %+v", res)
+	}
+	if naCount != 1 {
+		t.Fatalf("expected exactly one protocol-NA verdict, got %d in %+v", naCount, res)
 	}
 }
 
@@ -77,10 +91,24 @@ func TestNDEATHBeforeDisconnect_NonCompliant(t *testing.T) {
 	if len(res) == 0 {
 		t.Fatalf("expected at least one result, got none")
 	}
+	failCount, naCount := 0, 0
 	for _, r := range res {
-		if r.Status != runner.StatusFail {
-			t.Fatalf("expected all fail, got %+v", res)
+		switch r.Status {
+		case runner.StatusFail:
+			failCount++
+		case runner.StatusNotApplicable:
+			// The mqtt311/mqtt50 IDs are protocol-specific; the variant the
+			// SUT didn't use is intentionally NA. That's expected here.
+			naCount++
+		default:
+			t.Fatalf("expected fail/n_a, got %+v", res)
 		}
+	}
+	if failCount == 0 {
+		t.Fatalf("expected at least one fail, got %+v", res)
+	}
+	if naCount != 1 {
+		t.Fatalf("expected exactly one protocol-NA verdict, got %d in %+v", naCount, res)
 	}
 }
 

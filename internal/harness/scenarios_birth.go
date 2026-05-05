@@ -642,13 +642,24 @@ func EdgeCleanSession(b *Broker) []runner.Result {
 		}
 		scored = true
 		subj := e.ClientID
-		// Clean session/start
-		for _, id := range []string{id311, id50} {
+		// Clean session/start. The 311 vs 50 IDs are protocol-specific in
+		// the Java TCK — its check fires only for the matching version
+		// and otherwise leaves the ID NOT_EXECUTED. Mirror that grading so
+		// bench/Java agreement isn't dragged down by spurious PASSes for
+		// version we didn't actually use.
+		isMQTT5 := e.ProtocolVersion == 5
+		cleanResult := func(id string) runner.Result {
 			if !e.CleanStart {
-				out = append(out, runner.Fail(id, subj, "Edge CONNECT Clean flag = false, must be true"))
-			} else {
-				out = append(out, runner.Pass(id, subj))
+				return runner.Fail(id, subj, "Edge CONNECT Clean flag = false, must be true")
 			}
+			return runner.Pass(id, subj)
+		}
+		if isMQTT5 {
+			out = append(out, runner.NA(id311, "Edge connected MQTT 5; 3.1.1 Clean Session check NA"))
+			out = append(out, cleanResult(id50))
+		} else {
+			out = append(out, cleanResult(id311))
+			out = append(out, runner.NA(id50, "Edge connected MQTT 3.1.1; MQTT 5 Clean Start check NA"))
 		}
 		// Will present
 		out = append(out, runner.Pass(idWill, subj))
@@ -772,26 +783,33 @@ func EdgeBirthMetricNaming(b *Broker) []runner.Result {
 	}
 
 	// idAliasUnique: aliases must be unique across this edge's metrics.
-	uniqueOK := true
-	var dupeDetail string
-	for _, uses := range aliasesByEdge {
-		seen := map[uint64]string{}
-		for _, u := range uses {
-			if prev, ok := seen[u.alias]; ok && prev != u.metric {
-				uniqueOK = false
-				dupeDetail = fmt.Sprintf("alias %d reused: %q and %q", u.alias, prev, u.metric)
+	// Only fires when the edge actually used aliases — Java leaves this
+	// NOT_EXECUTED otherwise, so PASSing here when there's nothing to
+	// check just creates a spurious disagreement.
+	if !usesAliases {
+		out = append(out, runner.NA(idAliasUnique, "no metric aliases observed"))
+	} else {
+		uniqueOK := true
+		var dupeDetail string
+		for _, uses := range aliasesByEdge {
+			seen := map[uint64]string{}
+			for _, u := range uses {
+				if prev, ok := seen[u.alias]; ok && prev != u.metric {
+					uniqueOK = false
+					dupeDetail = fmt.Sprintf("alias %d reused: %q and %q", u.alias, prev, u.metric)
+					break
+				}
+				seen[u.alias] = u.metric
+			}
+			if !uniqueOK {
 				break
 			}
-			seen[u.alias] = u.metric
 		}
-		if !uniqueOK {
-			break
+		if uniqueOK {
+			out = append(out, runner.Pass(idAliasUnique, ""))
+		} else {
+			out = append(out, runner.Fail(idAliasUnique, "", dupeDetail))
 		}
-	}
-	if uniqueOK {
-		out = append(out, runner.Pass(idAliasUnique, ""))
-	} else {
-		out = append(out, runner.Fail(idAliasUnique, "", dupeDetail))
 	}
 
 	// idCase: SHOULD NOT have two metric names that differ only in case.

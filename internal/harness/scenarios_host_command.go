@@ -231,16 +231,12 @@ func HostDCMDCompliant(b *Broker) []runner.Result {
 				runner.Pass(idTopicTS, subj),
 			)
 		}
-		nameOK, valueOK := true, true
-		var nameWhy, valueWhy string
+		nameOK := true
+		var nameWhy string
 		for _, m := range p.GetMetrics() {
 			if m.GetName() == "" && m.Alias == nil {
 				nameOK = false
 				nameWhy = "DCMD metric has neither name nor alias"
-			}
-			if !m.GetIsNull() && m.Value == nil {
-				valueOK = false
-				valueWhy = "DCMD metric " + m.GetName() + " has no value"
 			}
 		}
 		if nameOK {
@@ -248,11 +244,13 @@ func HostDCMDCompliant(b *Broker) []runner.Result {
 		} else {
 			out = append(out, runner.Fail(idMetricName, subj, nameWhy))
 		}
-		if valueOK {
-			out = append(out, runner.Pass(idMetricValue, subj))
-		} else {
-			out = append(out, runner.Fail(idMetricValue, subj, valueWhy))
-		}
+		// dcmd-metric-value asserts the SUT applies the new value to its
+		// Device metric — observable only via a subsequent DDATA reflecting
+		// the change. Java leaves this NOT_EXECUTED because it has no SUT;
+		// scoring it PASS on payload presence creates a spurious agreement
+		// gap, so emit NA here as well.
+		out = append(out, runner.NA(idMetricValue,
+			"requires SUT-side application of value; not observable from packet stream"))
 	}
 	if !scored {
 		na := "no DCMD observed in scenario"
