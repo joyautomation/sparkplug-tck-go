@@ -69,11 +69,18 @@ type Broker struct {
 }
 
 // NewBroker spins up a fresh mochi server on a free localhost TCP port,
-// installs an allow-all auth hook, and registers the recorder.
+// installs an allow-all auth hook, and registers the recorder. Used by
+// tests; CLI/harness mode wants NewBrokerAt to bind a known address.
 func NewBroker() (*Broker, error) {
-	// Bind on :0 so the OS picks a free port — this is what lets us run
-	// scenarios in parallel without coordinating port reservations.
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	return NewBrokerAt("127.0.0.1:0")
+}
+
+// NewBrokerAt is NewBroker but binds the listener to the supplied
+// address (host:port). Pass "host:0" to let the OS pick the port.
+func NewBrokerAt(bind string) (*Broker, error) {
+	// Reserve up front so we can echo the resolved address back to the
+	// caller (and so :0 yields a usable port instead of a race).
+	ln, err := net.Listen("tcp", bind)
 	if err != nil {
 		return nil, fmt.Errorf("reserve port: %w", err)
 	}

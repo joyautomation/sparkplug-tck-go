@@ -1,9 +1,12 @@
 // Command sparkplug-tck runs the registered TCK assertions against a
 // captured sequence of Sparkplug messages.
 //
-// Two input modes:
-//   -fixture <path|->   JSON fixture (offline, deterministic)
-//   -broker <url>       Live MQTT broker; capture for -duration then assert
+// Three input modes:
+//   -fixture <path|->                JSON fixture (offline, deterministic)
+//   -broker <url>                    Passive: tap a live broker and assert
+//   -harness -profile <edge|host>    Active: run an in-process broker, the
+//                                    SUT connects to it, then evaluate a
+//                                    profile of strict (Layer-3) scenarios
 package main
 
 import (
@@ -15,11 +18,14 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"sort"
+	"strings"
 	"syscall"
 	"time"
 
 	_ "github.com/joyautomation/sparkplug-tck-go/internal/assertions" // registry side-effects
 	"github.com/joyautomation/sparkplug-tck-go/internal/capture"
+	"github.com/joyautomation/sparkplug-tck-go/internal/harness"
 	"github.com/joyautomation/sparkplug-tck-go/internal/runner"
 	"github.com/joyautomation/sparkplug-tck-go/internal/spb"
 )
@@ -52,13 +58,34 @@ func main() {
 	broker := flag.String("broker", "", "MQTT broker URL (e.g. tcp://localhost:1883)")
 	username := flag.String("username", "", "MQTT username (with -broker)")
 	password := flag.String("password", "", "MQTT password (with -broker)")
-	duration := flag.Duration("duration", 30*time.Second, "capture duration when using -broker")
+	duration := flag.Duration("duration", 30*time.Second, "capture/harness duration")
 	jsonOut := flag.Bool("json", false, "emit results as JSON instead of human-readable")
+	harnessMode := flag.Bool("harness", false, "run an in-process broker; SUT connects to it")
+	harnessBind := flag.String("listen", "127.0.0.1:1883", "harness broker bind address")
+	profile := flag.String("profile", "", "harness profile: "+strings.Join(profileNames(), ", "))
 	flag.Parse()
 
-	if (*fixture == "") == (*broker == "") {
-		fmt.Fprintln(os.Stderr, "usage: sparkplug-tck (-fixture <path|->) | (-broker <url> [-duration 30s])")
+	modes := 0
+	if *fixture != "" {
+		modes++
+	}
+	if *broker != "" {
+		modes++
+	}
+	if *harnessMode {
+		modes++
+	}
+	if modes != 1 {
+		fmt.Fprintln(os.Stderr, "usage: sparkplug-tck (-fixture <path|->) | (-broker <url>) | (-harness -profile <name>)")
 		os.Exit(2)
+	}
+
+	if *harnessMode {
+		if err := runHarness(*harnessBind, *profile, *duration, *jsonOut); err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
+		}
+		return
 	}
 
 	var msgs []spb.Message
@@ -196,6 +223,71 @@ func printHuman(w io.Writer, results []runner.Result) {
 		fmt.Fprintln(w)
 	}
 	fmt.Fprintf(w, "\n%d pass, %d fail, %d n/a, %d total\n", pass, fail, na, len(results))
+}
+
+// runHarness boots the in-process broker, blocks until the duration
+// elapses or the operator hits Ctrl-C, then evaluates the named profile
+// against everything the broker recorded. The same printHuman / JSON
+// emitters are reused so harness output is interchangeable with passive
+// output.
+func runHarness(bind, profileName string, duration time.Duration, jsonOut bool) error {
+	prof, ok := harness.Profiles[profileName]
+	if !ok {
+		return fmt.Errorf("unknown profile %q (have: %s)", profileName,
+			strings.Join(profileNames(), ", "))
+	}
+
+	b, err := harness.NewBrokerAt(bind)
+	if err != nil {
+		return fmt.Errorf("start harness broker: %w", err)
+	}
+	defer b.Close()
+
+	fmt.Fprintf(os.Stderr, "harness broker listening on %s — point your SUT here\n", b.URL())
+	fmt.Fprintf(os.Stderr, "running profile %q for %s (Ctrl-C to evaluate early)\n",
+		prof.Name, duration)
+
+	ctx, cancel := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+	case <-timer.C:
+	}
+
+	results := prof.Run(b)
+	if jsonOut {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(results)
+	} else {
+		printHuman(os.Stdout, results)
+	}
+	if hasFail(results) {
+		return fmt.Errorf("harness: %d failure(s)", countFails(results))
+	}
+	return nil
+}
+
+func countFails(results []runner.Result) int {
+	n := 0
+	for _, r := range results {
+		if r.Status == runner.StatusFail {
+			n++
+		}
+	}
+	return n
+}
+
+func profileNames() []string {
+	names := make([]string, 0, len(harness.Profiles))
+	for n := range harness.Profiles {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func hasFail(results []runner.Result) bool {
