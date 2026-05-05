@@ -12,3 +12,9 @@
 # upstream-tck HiveMQ runtime state
 scripts/upstream-tck/hivemq.pid
 scripts/upstream-tck/hivemq.out
+
+# parity sweep artefacts (run-parity-sweep.sh + diff)
+/.parity-per-test/
+/java.json
+/go.json
+/diff.json
