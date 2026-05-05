@@ -129,6 +129,27 @@ func (b *Broker) Events() []Event {
 	return out
 }
 
+// WaitForDisconnect polls for an EvDisconnect event from clientID, up to
+// timeout. The hook fires asynchronously after Disconnect() returns, so
+// drive code uses this instead of a blind sleep.
+func (b *Broker) WaitForDisconnect(clientID string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for {
+		b.mu.Lock()
+		for _, e := range b.events {
+			if e.Type == EvDisconnect && e.ClientID == clientID {
+				b.mu.Unlock()
+				return true
+			}
+		}
+		b.mu.Unlock()
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 func (b *Broker) Close() error {
 	return b.server.Close()
 }

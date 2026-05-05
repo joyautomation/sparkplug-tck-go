@@ -49,7 +49,7 @@ func driveEdge(b *harness.Broker) {
 	// real observation pair. Mirrors the orchestrator's NCMD rebirth
 	// handler — both engines need to see this dance to PASS rebirth-action-*.
 	c.Publish("spBv1.0/G/NCMD/N", 0, false, ncmdRebirthPayload(time.Now().UnixMilli())).WaitTimeout(2 * time.Second)
-	time.Sleep(50 * time.Millisecond) // ensure NBIRTH timestamp is strictly after NCMD
+	time.Sleep(2 * time.Millisecond) // ensure NBIRTH timestamp (UnixMilli) is strictly after NCMD
 	rebirthNow := time.Now().UnixMilli()
 	c.Publish("spBv1.0/G/NBIRTH/N", 0, false, nbirthPayload(rebirthNow, 0, 0)).WaitTimeout(2 * time.Second)
 	c.Publish("spBv1.0/G/DBIRTH/N/D", 0, false, dbirthPayload(rebirthNow, 1)).WaitTimeout(2 * time.Second)
@@ -58,7 +58,7 @@ func driveEdge(b *harness.Broker) {
 	c.Publish("spBv1.0/G/DDEATH/N/D", 0, false, ddeathPayload(time.Now().UnixMilli(), seq)).WaitTimeout(2 * time.Second)
 	c.Publish("spBv1.0/G/NDEATH/N", 0, false, bdSeqPayload(0)).WaitTimeout(2 * time.Second)
 	c.Disconnect(200)
-	time.Sleep(100 * time.Millisecond)
+	b.WaitForDisconnect("bench-edge", 100*time.Millisecond)
 }
 
 func nbirthPayload(ts int64, seq, bdSeq uint64) []byte {
@@ -270,7 +270,7 @@ func driveHost(b *harness.Broker) {
 	death, _ := json.Marshal(stateBody{Online: false, Timestamp: deathTS})
 	c.Publish("spBv1.0/STATE/factory", 1, true, death).WaitTimeout(2 * time.Second)
 	c.Disconnect(200)
-	time.Sleep(100 * time.Millisecond)
+	b.WaitForDisconnect("bench-host", 100*time.Millisecond)
 }
 
 func ncmdRebirthPayload(ts int64) []byte {
