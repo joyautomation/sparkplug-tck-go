@@ -6,7 +6,7 @@ The official TCK is a Java/HiveMQ stack: ~10s JVM warmup, heavyweight to run as 
 
 ## Status
 
-Early but executable. Assertion catalog is extracted; the runner, session tracker, MQTT capture, and 100 of 274 assertions are wired. The CLI runs against either a JSON fixture or a live MQTT broker.
+Early but executable. Assertion catalog is extracted; the runner, session tracker, MQTT capture, and **all 274 assertions** are wired. The CLI runs against either a JSON fixture or a live MQTT broker. Many host-side and connection-level rules currently reduce to "presence in capture" — tightening those to causal/ordering checks is a follow-up that needs additional session-level state.
 
 ## Parity strategy
 
@@ -270,8 +270,32 @@ tck-id-payloads-ndeath-will-message-publisher{,-disconnect-mqtt311,-disconnect-m
 tck-id-operational-behavior-data-commands-{ncmd,dcmd}-{metric-name,metric-value}
 ```
 
-221 of 274. Many of the remaining assertions reduce to additional
-`messageRule` entries (see `internal/assertions/message_rules.go`).
+Host-side STATE/PHID/CONNECT aliases, edge-node termination + reordering,
+intentional-disconnect, device-DDEATH, rebirth-action passes,
+NCMD/DCMD subscription presence, and case-sensitivity walks for
+metric names + Sparkplug IDs:
+```
+tck-id-host-topic-phid-{birth-message,birth-required,birth-sub-required,birth-payload-timestamp}
+tck-id-host-topic-phid-death-{required,payload-timestamp-connect,payload-timestamp-disconnect-clean,payload-timestamp-disconnect-with-no-disconnect-packet}
+tck-id-message-flow-phid-sparkplug-{state-publish,state-publish-payload-timestamp,subscription,clean-session-311,clean-session-50}
+tck-id-message-flow-hid-sparkplug-state-message-delivered
+tck-id-operational-behavior-host-application-{connect-birth,connect-will,disconnect-intentional,host-id,multi-server-timestamp,termination}
+tck-id-operational-behavior-primary-application-state-with-multiple-servers-{single-server,state,state-subs,walk}
+tck-id-operational-behavior-edge-node-termination-host-action-{ndeath,ddeath}-*
+tck-id-operational-behavior-edge-node-termination-host-{offline,offline-reconnect,offline-timestamp}
+tck-id-operational-behavior-edge-node-{intentional-disconnect-ndeath,intentional-disconnect-packet,birth-sequence-wait}
+tck-id-operational-behavior-device-ddeath
+tck-id-message-flow-edge-node-birth-publish-phid-{wait,wait-id,wait-online,wait-timestamp,offline}
+tck-id-message-flow-{edge-node-ncmd,device-dcmd}-subscribe
+tck-id-operational-behavior-data-commands-rebirth-action-{1,2,3}
+tck-id-operational-behavior-host-reordering-{param,start,success,rebirth}
+tck-id-case-sensitivity-{metric-names,sparkplug-ids}
+```
+
+**274 of 274 — full catalog wired.** Many of the host-side and
+connection-level rules reduce to "presence in capture" since they're
+not directly observable from a passive MQTT capture; tightening those
+to causal/ordering checks is a follow-up that needs session-level state.
 
 ## Regenerating the catalog
 
@@ -294,6 +318,8 @@ Set `SPARKPLUG_SPEC_REF` to pin a tag instead of `master`.
 - [x] Third batch: host STATE envelope/topic + rebirth metric (20)
 - [x] Fourth batch: data-publish + template-definition + UTC + NCMD rebirth (27)
 - [x] Fifth batch: birth-metric + template-instance + cmd-metric aliases (21)
+- [x] Sixth batch: host STATE/PHID + edge-termination + case-sensitivity (53)
+- [x] **Catalog complete (274/274).**
 - [ ] Remaining payload-level checks (~80 mechanical)
 - [ ] Alias rules + sequencing checks not yet covered
 - [ ] Edge-node profile parity with HiveMQ TCK
