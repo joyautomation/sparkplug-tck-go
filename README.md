@@ -217,7 +217,23 @@ tck-id-payloads-alias-uniqueness
 tck-id-payloads-propertyset-quality-value-{type,value}
 ```
 
-141 of 274. Many of the remaining assertions reduce to additional
+Chapter-4 [tck-id-topics-*] aliases for QoS/retain/timestamp/seq/topic
+across DBIRTH, NDATA, DDATA, DDEATH, NDEATH, plus per-edge sequence-inc
+aliases and state-presence aliases:
+```
+tck-id-topics-{dbirth,ndata,ddata,ddeath}-mqtt
+tck-id-topics-{nbirth,dbirth,ndata,ddata,ndeath,ddeath}-topic
+tck-id-topics-{nbirth,dbirth,ndata,ddata}-timestamp
+tck-id-topics-{dbirth,ndata,ddata,ddeath}-seq[-num]
+tck-id-topics-ndeath-seq
+tck-id-topics-{ndata,ddata,ndeath}-payload
+tck-id-payloads-nbirth-{qos,retain}
+tck-id-payloads-ddeath-seq-number
+tck-id-payloads-{ndata,ddata,dbirth,ddeath}-seq-inc
+tck-id-payloads-state-{birth,subscribe,will-message}
+```
+
+173 of 274. Many of the remaining assertions reduce to additional
 `messageRule` entries (see `internal/assertions/message_rules.go`).
 
 ## Regenerating the catalog
