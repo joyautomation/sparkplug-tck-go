@@ -124,7 +124,9 @@ assertions.json                   # checked-in catalog; regenerate via script
 
 - **274/274** spec assertions wired in passive mode
 - **100.0%** per-ID logic agreement with the upstream Java TCK across 11 test classes
-- **93.6%** union parity (catalog + harness combined); 19 IDs are not yet scored on either side (mostly `intro-*` topic-naming aliases and `conformance-mqtt-aware-*` broker rules)
+- **97.2%** union parity (280/288 in-scope IDs scored by passive or harness)
+- **97.3%** upstream-test parity (252/259 client-side test-asserted IDs covered by the harness)
+- 8 client-conformance IDs still uncovered: 7 `tck-id-intro-*` (Group/Edge/Device ID character + uniqueness rules) and `tck-id-principles-rbe-recommended` (the soft "publish on change" SHOULD)
 
 ## Roadmap
 
@@ -135,13 +137,14 @@ assertions.json                   # checked-in catalog; regenerate via script
 - [x] Cross-validation harness against the upstream Java TCK (`sparkplug-tck-correctness`)
 - [x] Per-ID diff tool (`sparkplug-tck-diff`) with logic-agreement/coverage-Δ split
 - [x] 100% logic agreement on 11 upstream tests
-- [ ] Remaining 19 uncovered IDs (broker-conformance + topic-naming aliases)
-- [ ] CI: scheduled spec-drift detection
-- [ ] CI: parity test — same fixture run through both TCKs, diff results
+- [x] CI: vet + build + race tests + parity floor on every PR
+- [x] CI: scheduled spec-drift detection
+- [x] CI: parity test — drive a synthetic SUT through both TCKs and diff verdicts (nightly + manual)
+- [ ] Topic-naming aliases — 8 `tck-id-intro-*` IDs (Group/Edge/Device ID character + uniqueness rules) and `tck-id-principles-rbe-recommended` (the soft "publish on change" SHOULD)
 
 ## Scope
 
-This project targets **client conformance** — Sparkplug Edge Nodes and Host Applications. Broker-level conformance tests (`tck-id-conformance-mqtt-*`) and multi-broker HA scenarios are intentionally out of scope. See [project notes](#) if you need those — the upstream Java TCK is still the right tool there.
+This project targets **client conformance** — Sparkplug Edge Nodes and Host Applications. The 11 `tck-id-conformance-mqtt-*` IDs (basic/aware broker conformance) and multi-broker HA scenarios are intentionally **out of scope** — the upstream Java TCK is the right tool there. They are excluded from the catalog total used in parity reporting; the headline parity numbers reflect only client-conformance IDs.
 
 ## License
 
