@@ -518,7 +518,6 @@ func driveCompliantHost(broker, host string) {
 	if tok := c.Connect(); !tok.WaitTimeout(5*time.Second) || tok.Error() != nil {
 		return
 	}
-	defer c.Disconnect(200)
 	mu.Lock()
 	client = c
 	mu.Unlock()
@@ -538,6 +537,14 @@ func driveCompliantHost(broker, host string) {
 	// Hold the session open long enough for the TCK to send its offline
 	// provocation and observe our BIRTH-resend before we DISCONNECT.
 	time.Sleep(5 * time.Second)
+
+	// Spec: a Host Application MUST publish a death (online:false) on
+	// the STATE topic before intentionally disconnecting — host/
+	// SessionTerminationTest fails the SUT when the death isn't seen.
+	deathTS := time.Now().UnixMilli()
+	deathBody, _ := json.Marshal(map[string]any{"online": false, "timestamp": deathTS})
+	c.Publish(stateTopic, 1, true, deathBody).WaitTimeout(2 * time.Second)
+	c.Disconnect(200)
 }
 
 // onlineHost is a long-lived Sparkplug Host Application used by the

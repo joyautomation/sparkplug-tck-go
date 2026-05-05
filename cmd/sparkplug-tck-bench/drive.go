@@ -138,7 +138,10 @@ func ddeathPayload(ts int64, seq uint64) []byte {
 
 // driveHost replays a compliant Host Application lifecycle: CONNECT
 // with STATE Will + clean=true, subscribe STATE, publish birth, publish
-// death, clean DISCONNECT.
+// NCMD (rebirth + named-metric write) + DCMD (named-metric write) so
+// the HostNCMDCompliant / HostDCMDCompliant scenarios actually score
+// instead of falling through to NOT_EXECUTED, then publish death and
+// clean DISCONNECT.
 func driveHost(b *harness.Broker) {
 	now := time.Now().UnixMilli()
 	willBody, _ := json.Marshal(stateBody{Online: false, Timestamp: now})
@@ -154,11 +157,69 @@ func driveHost(b *harness.Broker) {
 	c.Subscribe("spBv1.0/STATE/factory", 1, nil).WaitTimeout(2 * time.Second)
 	birth, _ := json.Marshal(stateBody{Online: true, Timestamp: now})
 	c.Publish("spBv1.0/STATE/factory", 1, true, birth).WaitTimeout(2 * time.Second)
+
+	c.Publish("spBv1.0/G/NCMD/N", 0, false, ncmdRebirthPayload(time.Now().UnixMilli())).WaitTimeout(2 * time.Second)
+	c.Publish("spBv1.0/G/NCMD/N", 0, false, ncmdMetricPayload(time.Now().UnixMilli(), "Heartbeat", 7)).WaitTimeout(2 * time.Second)
+	c.Publish("spBv1.0/G/DCMD/N/D", 0, false, dcmdMetricPayload(time.Now().UnixMilli(), "Counter", 42)).WaitTimeout(2 * time.Second)
+
+	// Inject NDEATH + DDEATH on the broker so HostNDEATHActions /
+	// HostDDEATHActions can score the host's edge-termination rules.
+	// In a real deployment these come from the edge — the bench
+	// publishes them as a phantom edge so the broker events include
+	// them in the host profile run.
+	c.Publish("spBv1.0/G/DDEATH/N/D", 0, false, ddeathPayload(time.Now().UnixMilli(), 5)).WaitTimeout(2 * time.Second)
+	c.Publish("spBv1.0/G/NDEATH/N", 0, false, bdSeqPayload(0)).WaitTimeout(2 * time.Second)
+
 	deathTS := time.Now().UnixMilli()
 	death, _ := json.Marshal(stateBody{Online: false, Timestamp: deathTS})
 	c.Publish("spBv1.0/STATE/factory", 1, true, death).WaitTimeout(2 * time.Second)
 	c.Disconnect(200)
 	time.Sleep(100 * time.Millisecond)
+}
+
+func ncmdRebirthPayload(ts int64) []byte {
+	tsU := uint64(ts)
+	boolDT := uint32(spbpb.DataType_Boolean)
+	name := "Node Control/Rebirth"
+	p := &spbpb.Payload{
+		Timestamp: &tsU,
+		Metrics: []*spbpb.Payload_Metric{{
+			Name: &name, Datatype: &boolDT, Timestamp: &tsU,
+			Value: &spbpb.Payload_Metric_BooleanValue{BooleanValue: true},
+		}},
+	}
+	raw, _ := proto.Marshal(p)
+	return raw
+}
+
+func ncmdMetricPayload(ts int64, name string, v int32) []byte {
+	tsU := uint64(ts)
+	intDT := uint32(spbpb.DataType_Int32)
+	val := uint32(v)
+	p := &spbpb.Payload{
+		Timestamp: &tsU,
+		Metrics: []*spbpb.Payload_Metric{{
+			Name: &name, Datatype: &intDT, Timestamp: &tsU,
+			Value: &spbpb.Payload_Metric_IntValue{IntValue: val},
+		}},
+	}
+	raw, _ := proto.Marshal(p)
+	return raw
+}
+
+func dcmdMetricPayload(ts int64, name string, v int32) []byte {
+	tsU := uint64(ts)
+	intDT := uint32(spbpb.DataType_Int32)
+	val := uint32(v)
+	p := &spbpb.Payload{
+		Timestamp: &tsU,
+		Metrics: []*spbpb.Payload_Metric{{
+			Name: &name, Datatype: &intDT, Timestamp: &tsU,
+			Value: &spbpb.Payload_Metric_IntValue{IntValue: val},
+		}},
+	}
+	raw, _ := proto.Marshal(p)
+	return raw
 }
 
 type stateBody struct {
