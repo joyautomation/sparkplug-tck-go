@@ -931,9 +931,12 @@ func nbirthPayload(ts int64, seq, bdSeq uint64) []byte {
 	bdSeqDT := uint32(spbpb.DataType_UInt64)
 	boolDT := uint32(spbpb.DataType_Boolean)
 	intDT := uint32(spbpb.DataType_Int32)
+	tmplDT := uint32(spbpb.DataType_Template)
 	bdSeqName := "bdSeq"
 	rebirthName := "Node Control/Rebirth"
 	hbName := "Heartbeat"
+	tempName := "Temperature"
+	tmplName := "MotorDef"
 	rebirthVal := false
 	hbVal := uint32(0)
 	bd := bdSeq
@@ -947,6 +950,17 @@ func nbirthPayload(ts int64, seq, bdSeq uint64) []byte {
 				Value: &spbpb.Payload_Metric_BooleanValue{BooleanValue: rebirthVal}},
 			{Name: &hbName, Datatype: &intDT, Timestamp: &tsU,
 				Value: &spbpb.Payload_Metric_IntValue{IntValue: hbVal}},
+			// PropertySet on a metric so propertyvalue/propertyset
+			// assertions have something to score in both engines.
+			{Name: &tempName, Datatype: &intDT, Timestamp: &tsU,
+				Value:      &spbpb.Payload_Metric_IntValue{IntValue: uint32(72)},
+				Properties: sampleMetricProperties()},
+			// Template Definition so template-* assertions score; the
+			// instance gets published in DBIRTH.
+			{Name: &tmplName, Datatype: &tmplDT, Timestamp: &tsU,
+				Value: &spbpb.Payload_Metric_TemplateValue{
+					TemplateValue: motorTemplate(true /*definition*/),
+				}},
 		},
 	}
 	raw, _ := proto.Marshal(p)
@@ -956,7 +970,9 @@ func nbirthPayload(ts int64, seq, bdSeq uint64) []byte {
 func dbirthPayload(ts int64, seq uint64) []byte {
 	tsU := uint64(ts)
 	intDT := uint32(spbpb.DataType_Int32)
+	tmplDT := uint32(spbpb.DataType_Template)
 	name := "Counter"
+	tmplName := "Motor1"
 	v := uint32(0)
 	p := &spbpb.Payload{
 		Timestamp: &tsU,
@@ -964,11 +980,63 @@ func dbirthPayload(ts int64, seq uint64) []byte {
 		Metrics: []*spbpb.Payload_Metric{
 			{Name: &name, Datatype: &intDT, Timestamp: &tsU,
 				Value: &spbpb.Payload_Metric_IntValue{IntValue: v}},
+			{Name: &tmplName, Datatype: &tmplDT, Timestamp: &tsU,
+				Value: &spbpb.Payload_Metric_TemplateValue{
+					TemplateValue: motorTemplate(false /*instance*/),
+				}},
 		},
 	}
 	raw, _ := proto.Marshal(p)
 	return raw
 }
+
+func sampleMetricProperties() *spbpb.Payload_PropertySet {
+	int32Type := uint32(spbpb.DataType_Int32)
+	strType := uint32(spbpb.DataType_String)
+	qualityVal := uint32(192) // good
+	engUnit := "degF"
+	return &spbpb.Payload_PropertySet{
+		Keys: []string{"quality", "engUnit"},
+		Values: []*spbpb.Payload_PropertyValue{
+			{Type: &int32Type, Value: &spbpb.Payload_PropertyValue_IntValue{IntValue: qualityVal}},
+			{Type: &strType, Value: &spbpb.Payload_PropertyValue_StringValue{StringValue: engUnit}},
+		},
+	}
+}
+
+func motorTemplate(isDefinition bool) *spbpb.Payload_Template {
+	intDT := uint32(spbpb.DataType_Int32)
+	strDT := uint32(spbpb.DataType_String)
+	rpmName := "rpm"
+	statusName := "status"
+	rpmVal := uint32(0)
+	statusVal := "stopped"
+	version := "1.0.0"
+	isDef := isDefinition
+	tmpl := &spbpb.Payload_Template{
+		Version:      &version,
+		IsDefinition: &isDef,
+		Metrics: []*spbpb.Payload_Metric{
+			{Name: &rpmName, Datatype: &intDT,
+				Value: &spbpb.Payload_Metric_IntValue{IntValue: rpmVal}},
+			{Name: &statusName, Datatype: &strDT,
+				Value: &spbpb.Payload_Metric_StringValue{StringValue: statusVal}},
+		},
+		Parameters: []*spbpb.Payload_Template_Parameter{
+			{Name: stringPtrCorrectness("model"), Type: &strDT,
+				Value: &spbpb.Payload_Template_Parameter_StringValue{StringValue: "ACME-1000"}},
+			{Name: stringPtrCorrectness("rated_rpm"), Type: &intDT,
+				Value: &spbpb.Payload_Template_Parameter_IntValue{IntValue: 1750}},
+		},
+	}
+	if !isDefinition {
+		ref := "MotorDef"
+		tmpl.TemplateRef = &ref
+	}
+	return tmpl
+}
+
+func stringPtrCorrectness(s string) *string { return &s }
 
 func ndataPayload(ts int64, seq uint64) []byte {
 	tsU := uint64(ts)
