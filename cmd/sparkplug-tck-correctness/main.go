@@ -31,12 +31,16 @@ import (
 
 // driverKind picks which synthetic SUT lifecycle the orchestrator drives
 // for a given test. Edge tests need a Sparkplug edge node; host tests
-// need a Sparkplug Host Application publishing STATE.
+// need a Sparkplug Host Application publishing STATE. driverHostOnline
+// is a host that must already be online BEFORE NEW_TEST — those tests
+// gate on checkHostApplicationIsOnline and bail immediately if the
+// retained STATE topic doesn't show online:true.
 type driverKind string
 
 const (
-	driverEdge driverKind = "edge"
-	driverHost driverKind = "host"
+	driverEdge       driverKind = "edge"
+	driverHost       driverKind = "host"
+	driverHostOnline driverKind = "host-online"
 )
 
 const (
@@ -44,6 +48,8 @@ const (
 	topicResults       = "SPARKPLUG_TCK/RESULT"
 	topicLog           = "SPARKPLUG_TCK/LOG"
 	topicResultsConfig = "SPARKPLUG_TCK/RESULT_CONFIG"
+	topicConsolePrompt = "SPARKPLUG_TCK/CONSOLE_PROMPT"
+	topicConsoleReply  = "SPARKPLUG_TCK/CONSOLE_REPLY"
 )
 
 type verdict struct {
@@ -122,6 +128,7 @@ func main() {
 
 		var args []string
 		var driver func()
+		var preStartedHost *onlineHost
 		switch driverKindFor(profile, testName) {
 		case driverEdge:
 			args = []string{runHost, *groupID, runEdge, *deviceID}
@@ -129,6 +136,24 @@ func main() {
 		case driverHost:
 			args = []string{runHost}
 			driver = func() { driveCompliantHost(*broker, runHost) }
+		case driverHostOnline:
+			// Test gates on host being online at NEW_TEST time, plus needs
+			// the host to publish NCMD/DCMD or reply to console prompts
+			// during the test. Pre-start the host so its STATE birth is
+			// retained before the TCK queries checkHostApplicationIsOnline.
+			args = []string{runHost, *groupID, runEdge, *deviceID}
+			// MessageOrderingTest takes a 5th parameter — reorderTimeout
+			// in milliseconds. Without it the test errors out at NEW_TEST
+			// time before publishing any verdicts.
+			if testName == "MessageOrderingTest" {
+				args = append(args, "5000")
+			}
+			oh, err := startOnlineHost(*broker, runHost, *groupID, runEdge, *deviceID)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s — pre-start failed: %v\n", spec, err)
+			}
+			preStartedHost = oh
+			driver = func() {} // host already running; nothing more to spawn
 		}
 
 		if err := ctrl.startTest(profile, testName, args); err != nil {
@@ -140,6 +165,9 @@ func main() {
 			fmt.Fprintf(os.Stderr, "%s — TIMEOUT after %s, partial results captured\n", spec, *timeout)
 		}
 		_ = ctrl.endTest()
+		if preStartedHost != nil {
+			preStartedHost.stop()
+		}
 		// END_TEST triggers the TCK extension to publish a SECOND, empty
 		// OVERALL summary. If we let it leak into the next test slot, it
 		// closes that test's channel and waitForOverall returns instantly
@@ -182,9 +210,16 @@ func parseSpec(s string) (profile, testName string, err error) {
 
 // driverKindFor maps a test spec to which SUT lifecycle to run. Tests
 // in the host/* tree need a host SUT; everything else (edge/*) needs
-// an edge node.
-func driverKindFor(profile, _ string) driverKind {
+// an edge node. Three host tests (EdgeSessionTermination, MessageOrdering,
+// SendCommand) call checkHostApplicationIsOnline at NEW_TEST time and
+// bail unless the host's retained STATE shows online:true — those need
+// driverHostOnline (pre-start the host before NEW_TEST).
+func driverKindFor(profile, testName string) driverKind {
 	if profile == "host" {
+		switch testName {
+		case "EdgeSessionTerminationTest", "MessageOrderingTest", "SendCommandTest":
+			return driverHostOnline
+		}
 		return driverHost
 	}
 	return driverEdge
@@ -503,6 +538,200 @@ func driveCompliantHost(broker, host string) {
 	// Hold the session open long enough for the TCK to send its offline
 	// provocation and observe our BIRTH-resend before we DISCONNECT.
 	time.Sleep(5 * time.Second)
+}
+
+// onlineHost is a long-lived Sparkplug Host Application used by the
+// host/* tests that gate on checkHostApplicationIsOnline at NEW_TEST
+// time (EdgeSessionTermination, MessageOrdering, SendCommand). It
+// connects, subscribes to the namespace + STATE topic + CONSOLE_PROMPT,
+// publishes its BIRTH retained (so the gate passes), and replies to
+// every prompt — either with a Sparkplug NCMD/DCMD (SendCommand) or
+// "PASS" on CONSOLE_REPLY (EdgeSessionTermination, MessageOrdering).
+type onlineHost struct {
+	c     mqtt.Client
+	group string
+	edge  string
+	dev   string
+
+	mu                sync.Mutex
+	nbirthMetricNames []string
+	dbirthMetricNames []string
+}
+
+// startOnlineHost connects the host, publishes the retained BIRTH, and
+// returns once it's safe to start the test (broker has the BIRTH).
+func startOnlineHost(broker, host, group, edge, dev string) (*onlineHost, error) {
+	clientID := "tck-correctness-host-" + host
+	stateTopic := fmt.Sprintf("spBv1.0/STATE/%s", host)
+	birthTS := time.Now().UnixMilli()
+	willBody, _ := json.Marshal(map[string]any{"online": false, "timestamp": birthTS})
+	birthBody, _ := json.Marshal(map[string]any{"online": true, "timestamp": birthTS})
+
+	oh := &onlineHost{group: group, edge: edge, dev: dev}
+
+	opts := mqtt.NewClientOptions().
+		AddBroker(broker).
+		SetClientID(clientID).
+		SetCleanSession(true).
+		SetConnectTimeout(5 * time.Second).
+		SetBinaryWill(stateTopic, willBody, 1, true).
+		SetDefaultPublishHandler(func(_ mqtt.Client, msg mqtt.Message) {
+			oh.onMessage(msg)
+		})
+	c := mqtt.NewClient(opts)
+	if tok := c.Connect(); !tok.WaitTimeout(5*time.Second) || tok.Error() != nil {
+		return nil, fmt.Errorf("connect: %v", tok.Error())
+	}
+	oh.c = c
+
+	c.Subscribe("spBv1.0/#", 1, nil).WaitTimeout(2 * time.Second)
+	c.Subscribe(stateTopic, 1, nil).WaitTimeout(2 * time.Second)
+	c.Subscribe(topicConsolePrompt, 1, nil).WaitTimeout(2 * time.Second)
+
+	tok := c.Publish(stateTopic, 1, true, birthBody)
+	tok.WaitTimeout(2 * time.Second)
+	// Tiny pause so the broker stores the retained STATE before
+	// checkHostApplicationIsOnline runs at NEW_TEST time.
+	time.Sleep(200 * time.Millisecond)
+	return oh, nil
+}
+
+func (h *onlineHost) stop() {
+	if h == nil || h.c == nil {
+		return
+	}
+	h.c.Disconnect(200)
+}
+
+func (h *onlineHost) onMessage(msg mqtt.Message) {
+	topic := msg.Topic()
+	switch {
+	case topic == topicConsolePrompt:
+		h.handlePrompt(string(msg.Payload()))
+	case strings.Contains(topic, "/NBIRTH/"):
+		names := metricNamesFrom(msg.Payload())
+		h.mu.Lock()
+		h.nbirthMetricNames = names
+		h.mu.Unlock()
+	case strings.Contains(topic, "/DBIRTH/"):
+		names := metricNamesFrom(msg.Payload())
+		h.mu.Lock()
+		h.dbirthMetricNames = names
+		h.mu.Unlock()
+	}
+}
+
+func metricNamesFrom(raw []byte) []string {
+	var p spbpb.Payload
+	if err := proto.Unmarshal(raw, &p); err != nil {
+		return nil
+	}
+	out := make([]string, 0, len(p.Metrics))
+	for _, m := range p.Metrics {
+		if m.Name != nil {
+			out = append(out, *m.Name)
+		}
+	}
+	return out
+}
+
+// handlePrompt dispatches by keyword match on the prompt text. The
+// SendCommand test asks the host to publish specific NCMD/DCMD; the
+// other prompt-based tests just want a "PASS" reply.
+func (h *onlineHost) handlePrompt(text string) {
+	switch {
+	case strings.Contains(text, "edge rebirth"):
+		h.publishNCMD("Node Control/Rebirth", boolValue(true))
+	case strings.Contains(text, "edge command") && strings.Contains(text, "update"):
+		name := h.firstNonRebirthMetric()
+		if name != "" {
+			h.publishNCMD(name, int32Value(1))
+		}
+	case strings.Contains(text, "device rebirth"):
+		name := h.firstDeviceMetric()
+		if name != "" {
+			h.publishDCMD(name, int32Value(0))
+		}
+	case strings.Contains(text, "device command"):
+		name := h.firstDeviceMetric()
+		if name != "" {
+			h.publishDCMD(name, int32Value(2))
+		}
+	default:
+		// EdgeSessionTermination / MessageOrdering style yes/no prompt.
+		h.c.Publish(topicConsoleReply, 1, false, []byte("PASS"))
+	}
+}
+
+func (h *onlineHost) firstNonRebirthMetric() string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, n := range h.nbirthMetricNames {
+		if n != "Node Control/Rebirth" && n != "bdSeq" {
+			return n
+		}
+	}
+	return ""
+}
+
+func (h *onlineHost) firstDeviceMetric() string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if len(h.dbirthMetricNames) > 0 {
+		return h.dbirthMetricNames[0]
+	}
+	return ""
+}
+
+func (h *onlineHost) publishNCMD(metric string, val metricValue) {
+	topic := fmt.Sprintf("spBv1.0/%s/NCMD/%s", h.group, h.edge)
+	h.c.Publish(topic, 0, false, cmdPayload(metric, val))
+}
+
+func (h *onlineHost) publishDCMD(metric string, val metricValue) {
+	topic := fmt.Sprintf("spBv1.0/%s/DCMD/%s/%s", h.group, h.edge, h.dev)
+	h.c.Publish(topic, 0, false, cmdPayload(metric, val))
+}
+
+// cmdPayload builds an NCMD/DCMD payload: timestamp, no seq, single metric.
+func cmdPayload(name string, val metricValue) []byte {
+	ts := uint64(time.Now().UnixMilli())
+	dt := uint32(val.dataType)
+	m := &spbpb.Payload_Metric{
+		Name:      &name,
+		Timestamp: &ts,
+		Datatype:  &dt,
+	}
+	val.applyTo(m)
+	p := &spbpb.Payload{
+		Timestamp: &ts,
+		Metrics:   []*spbpb.Payload_Metric{m},
+	}
+	raw, _ := proto.Marshal(p)
+	return raw
+}
+
+type metricValue struct {
+	dataType spbpb.DataType
+	applyTo  func(*spbpb.Payload_Metric)
+}
+
+func boolValue(v bool) metricValue {
+	return metricValue{
+		dataType: spbpb.DataType_Boolean,
+		applyTo: func(m *spbpb.Payload_Metric) {
+			m.Value = &spbpb.Payload_Metric_BooleanValue{BooleanValue: v}
+		},
+	}
+}
+
+func int32Value(v int32) metricValue {
+	return metricValue{
+		dataType: spbpb.DataType_Int32,
+		applyTo: func(m *spbpb.Payload_Metric) {
+			m.Value = &spbpb.Payload_Metric_IntValue{IntValue: uint32(v)}
+		},
+	}
 }
 
 // --- payload builders ---
