@@ -77,6 +77,8 @@ var HostApplicationProfile = Profile{
 		HostDDEATHActions,
 		HostWillCompliant,
 		HostBirthCompliant,
+		HostNCMDCompliant,
+		HostDCMDCompliant,
 	},
 }
 
