@@ -57,6 +57,7 @@ var HostApplicationProfile = Profile{
 		HostWillTimestampIsRecent,
 		HostDeathBeforeCleanDisconnect,
 		HostDeathBeforeUncleanDisconnect,
+		HostMessageOrdering,
 	},
 }
 
