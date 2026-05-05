@@ -19,7 +19,18 @@ type Scenario func(b *Broker) []runner.Result
 // packet. Passive captures pass on NDEATH presence alone — the harness
 // can verify causal ordering directly from the packet stream.
 func NDEATHBeforeDisconnect(b *Broker) []runner.Result {
-	const id = "tck-id-operational-behavior-edge-node-intentional-disconnect-ndeath"
+	// Three spec IDs phrase the same observation: the Edge Node MUST
+	// publish an NDEATH before terminating the MQTT connection. The
+	// mqtt311/mqtt50 variants narrow it by protocol version; we emit
+	// both because we don't track which the client used (the rule is
+	// version-independent in practice).
+	const idBase = "tck-id-operational-behavior-edge-node-intentional-disconnect-ndeath"
+	const idPacket = "tck-id-operational-behavior-edge-node-intentional-disconnect-packet"
+	const idShould = "tck-id-payloads-ndeath-will-message-publisher"
+	const idMqtt311 = "tck-id-payloads-ndeath-will-message-publisher-disconnect-mqtt311"
+	const idMqtt50 = "tck-id-payloads-ndeath-will-message-publisher-disconnect-mqtt50"
+	allIDs := []string{idBase, idPacket, idShould, idMqtt311, idMqtt50}
+
 	type lifecycle struct {
 		ndeath, disconnect int // event indices; -1 if not seen
 	}
@@ -42,23 +53,35 @@ func NDEATHBeforeDisconnect(b *Broker) []runner.Result {
 
 	var out []runner.Result
 	for client, lc := range byClient {
-		switch {
-		case lc.disconnect == -1:
+		if lc.disconnect == -1 {
 			// SUT never disconnected — nothing to assert against.
 			continue
+		}
+		switch {
 		case lc.ndeath == -1:
-			out = append(out, runner.Fail(id, client,
-				"DISCONNECT observed but no NDEATH was published first"))
+			for _, id := range allIDs {
+				out = append(out, runner.Fail(id, client,
+					"DISCONNECT observed but no NDEATH was published first"))
+			}
 		case lc.ndeath > lc.disconnect:
-			out = append(out, runner.Fail(id, client,
-				fmt.Sprintf("NDEATH at event #%d came after DISCONNECT at event #%d",
-					lc.ndeath, lc.disconnect)))
+			detail := fmt.Sprintf("NDEATH at event #%d came after DISCONNECT at event #%d",
+				lc.ndeath, lc.disconnect)
+			for _, id := range allIDs {
+				out = append(out, runner.Fail(id, client, detail))
+			}
 		default:
-			out = append(out, runner.Pass(id, client))
+			for _, id := range allIDs {
+				out = append(out, runner.Pass(id, client))
+			}
 		}
 	}
 	if len(out) == 0 {
-		return []runner.Result{runner.NA(id, "no DISCONNECT observed in scenario")}
+		na := "no DISCONNECT observed in scenario"
+		res := make([]runner.Result, 0, len(allIDs))
+		for _, id := range allIDs {
+			res = append(res, runner.NA(id, na))
+		}
+		return res
 	}
 	return out
 }

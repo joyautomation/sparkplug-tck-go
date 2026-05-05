@@ -49,8 +49,13 @@ func TestNDEATHBeforeDisconnect_Compliant(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	res := NDEATHBeforeDisconnect(b)
-	if len(res) != 1 || res[0].Status != runner.StatusPass {
-		t.Fatalf("expected single pass, got %+v", res)
+	if len(res) == 0 {
+		t.Fatalf("expected at least one result, got none")
+	}
+	for _, r := range res {
+		if r.Status != runner.StatusPass {
+			t.Fatalf("expected all pass, got %+v", res)
+		}
 	}
 }
 
@@ -69,8 +74,13 @@ func TestNDEATHBeforeDisconnect_NonCompliant(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	res := NDEATHBeforeDisconnect(b)
-	if len(res) != 1 || res[0].Status != runner.StatusFail {
-		t.Fatalf("expected single fail, got %+v", res)
+	if len(res) == 0 {
+		t.Fatalf("expected at least one result, got none")
+	}
+	for _, r := range res {
+		if r.Status != runner.StatusFail {
+			t.Fatalf("expected all fail, got %+v", res)
+		}
 	}
 }
 
@@ -87,8 +97,13 @@ func TestNDEATHBeforeDisconnect_NoLifecycle_NA(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 	res := NDEATHBeforeDisconnect(b)
-	if len(res) != 1 || res[0].Status != runner.StatusNotApplicable {
-		t.Fatalf("expected single NA, got %+v", res)
+	if len(res) == 0 {
+		t.Fatalf("expected at least one result, got none")
+	}
+	for _, r := range res {
+		if r.Status != runner.StatusNotApplicable {
+			t.Fatalf("expected all NA, got %+v", res)
+		}
 	}
 }
 

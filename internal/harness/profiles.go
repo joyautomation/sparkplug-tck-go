@@ -40,6 +40,7 @@ var EdgeNodeProfile = Profile{
 		EdgeRespondsToRebirth,
 		EdgeRebirthHaltsData,
 		EdgeRebirthBdSeqUnchanged,
+		EdgeDDEATHCompliant,
 	},
 }
 

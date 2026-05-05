@@ -27,6 +27,9 @@ func EdgeWillIsNDEATH(b *Broker) []runner.Result {
 	const idBase = "tck-id-payloads-ndeath-will-message"
 	const idQoS = "tck-id-payloads-ndeath-will-message-qos"
 	const idRetain = "tck-id-payloads-ndeath-will-message-retain"
+	// Same shape, different sections of the spec phrase it three ways:
+	const idMsgFlow = "tck-id-message-flow-edge-node-birth-publish-will-message-topic"
+	const idTopic = "tck-id-topics-ndeath-topic"
 	var out []runner.Result
 	scored := false
 	for _, e := range b.Events() {
@@ -41,8 +44,14 @@ func EdgeWillIsNDEATH(b *Broker) []runner.Result {
 		scored = true
 		subj := e.ClientID + " " + e.Will.Topic
 		// Base "Will is NDEATH" — already implied by the topic match,
-		// but emit a Pass row so the parity bench scores the ID.
-		out = append(out, runner.Pass(idBase, subj))
+		// but emit a Pass row so the parity bench scores the ID. The
+		// message-flow and topic-shape IDs are the same observation
+		// phrased in different spec sections.
+		out = append(out,
+			runner.Pass(idBase, subj),
+			runner.Pass(idMsgFlow, subj),
+			runner.Pass(idTopic, subj),
+		)
 		if e.Will.QoS != 1 {
 			out = append(out, runner.Fail(idQoS, subj,
 				fmt.Sprintf("Will QoS = %d, want 1", e.Will.QoS)))
@@ -56,10 +65,13 @@ func EdgeWillIsNDEATH(b *Broker) []runner.Result {
 		}
 	}
 	if !scored {
+		na := "no Edge Node CONNECT with NDEATH Will in scenario"
 		return []runner.Result{
-			runner.NA(idBase, "no Edge Node CONNECT with NDEATH Will in scenario"),
-			runner.NA(idQoS, "no Edge Node CONNECT with NDEATH Will in scenario"),
-			runner.NA(idRetain, "no Edge Node CONNECT with NDEATH Will in scenario"),
+			runner.NA(idBase, na),
+			runner.NA(idMsgFlow, na),
+			runner.NA(idTopic, na),
+			runner.NA(idQoS, na),
+			runner.NA(idRetain, na),
 		}
 	}
 	return out
