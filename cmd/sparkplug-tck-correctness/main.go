@@ -59,10 +59,11 @@ type verdict struct {
 }
 
 type report struct {
-	Test     string    `json:"test"`
-	Verdicts []verdict `json:"verdicts"`
-	Overall  string    `json:"overall,omitempty"`
-	Counts   counts    `json:"counts"`
+	Test       string    `json:"test"`
+	Verdicts   []verdict `json:"verdicts"`
+	Overall    string    `json:"overall,omitempty"`
+	Counts     counts    `json:"counts"`
+	WallclockUS int64    `json:"wallclock_us"`
 }
 
 type counts struct {
@@ -160,6 +161,7 @@ func main() {
 			driver = func() {} // host already running; nothing more to spawn
 		}
 
+		testStart := time.Now()
 		if err := ctrl.startTest(profile, testName, args); err != nil {
 			fail("start %s: %v", spec, err)
 		}
@@ -181,9 +183,10 @@ func main() {
 		time.Sleep(500 * time.Millisecond)
 
 		rep := ctrl.report(profile + "/" + testName)
+		rep.WallclockUS = time.Since(testStart).Microseconds()
 		reports = append(reports, rep)
-		fmt.Fprintf(os.Stderr, "%s — pass:%d fail:%d not_executed:%d other:%d (overall %s)\n",
-			rep.Test, rep.Counts.Pass, rep.Counts.Fail, rep.Counts.NotExecuted, rep.Counts.Other, rep.Overall)
+		fmt.Fprintf(os.Stderr, "%s — pass:%d fail:%d not_executed:%d other:%d (overall %s) [%dms]\n",
+			rep.Test, rep.Counts.Pass, rep.Counts.Fail, rep.Counts.NotExecuted, rep.Counts.Other, rep.Overall, rep.WallclockUS/1000)
 	}
 
 	enc := json.NewEncoder(os.Stdout)

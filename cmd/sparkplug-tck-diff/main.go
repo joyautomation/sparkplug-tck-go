@@ -22,9 +22,10 @@ import (
 )
 
 type javaReport struct {
-	Test     string         `json:"test"`
-	Verdicts []javaVerdict  `json:"verdicts"`
-	Overall  string         `json:"overall"`
+	Test        string        `json:"test"`
+	Verdicts    []javaVerdict `json:"verdicts"`
+	Overall     string        `json:"overall"`
+	WallclockUS int64         `json:"wallclock_us"`
 }
 
 // javaMulti is the multi-test JSON shape sparkplug-tck-correctness emits
@@ -40,7 +41,16 @@ type javaVerdict struct {
 }
 
 type goReport struct {
-	HarnessVerdicts map[string]string `json:"harness_verdicts"`
+	HarnessVerdicts map[string]string         `json:"harness_verdicts"`
+	WallclockUS     int64                     `json:"wallclock_us"`
+	Profiles        map[string]goProfilePerf  `json:"profile_perf"`
+}
+
+type goProfilePerf struct {
+	BrokerBootUS int `json:"broker_boot_us"`
+	DriveUS      int `json:"drive_us"`
+	EvalUS       int `json:"eval_us"`
+	TotalUS      int `json:"total_us"`
 }
 
 type row struct {
@@ -227,11 +237,56 @@ func emitMarkdownMulti(javaTests []javaReport, gr goReport) {
 		totalAgree+totalDisagree, totalAgree, totalDisagree,
 		percent(totalAgree, totalAgree+totalDisagree))
 	fmt.Println()
+	emitPerfSection(javaTests, gr)
 	for _, jr := range javaTests {
 		rows := buildRows(jr, gr)
 		sort.Slice(rows, func(i, j int) bool { return rows[i].ID < rows[j].ID })
 		emitTestSection(jr, rows)
 	}
+}
+
+// emitPerfSection compares wallclock per test (Java) vs the bench profile
+// the test corresponds to (Go). Edge tests share the edge-node profile;
+// host tests share the host-application profile. The Go-side cell is the
+// profile total — same number for every row in its group — so the column
+// reads as "what it costs to score the same set of IDs under each engine."
+func emitPerfSection(javaTests []javaReport, gr goReport) {
+	if len(javaTests) == 0 || javaTests[0].WallclockUS == 0 {
+		return
+	}
+	fmt.Println("## Perf parity")
+	fmt.Println()
+	fmt.Println("Wallclock per test. Java is the orchestrator's per-test runtime (HiveMQ + extension + SUT driver). Go is the corresponding bench profile total — one number per profile, repeated for every test in that profile.")
+	fmt.Println()
+	fmt.Println("| Test | Java (ms) | Go profile | Go (ms) | Speedup |")
+	fmt.Println("| --- | --- | --- | --- | --- |")
+	var javaTotal int64
+	for _, jr := range javaTests {
+		profile := "edge-node"
+		if strings.HasPrefix(jr.Test, "host/") {
+			profile = "host-application"
+		}
+		goUS := int64(0)
+		if p, ok := gr.Profiles[profile]; ok {
+			goUS = int64(p.TotalUS)
+		}
+		jaMS := jr.WallclockUS / 1000
+		goMS := goUS / 1000
+		speedup := "—"
+		if goUS > 0 {
+			speedup = fmt.Sprintf("%.0fx", float64(jr.WallclockUS)/float64(goUS))
+		}
+		fmt.Printf("| %s | %d | %s | %d | %s |\n", jr.Test, jaMS, profile, goMS, speedup)
+		javaTotal += jr.WallclockUS
+	}
+	goTotal := gr.WallclockUS
+	speedupAll := "—"
+	if goTotal > 0 {
+		speedupAll = fmt.Sprintf("%.0fx", float64(javaTotal)/float64(goTotal))
+	}
+	fmt.Printf("| **all** | **%d** | **all profiles** | **%d** | **%s** |\n",
+		javaTotal/1000, goTotal/1000, speedupAll)
+	fmt.Println()
 }
 
 func emitTestSection(jr javaReport, rows []row) {
