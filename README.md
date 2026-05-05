@@ -256,7 +256,21 @@ tck-id-payloads-metric-datatype-not-req
 tck-id-payloads-name-{birth-data-requirement,cmd-requirement}
 ```
 
-200 of 274. Many of the remaining assertions reduce to additional
+Birth-metric content (each NBIRTH/DBIRTH metric must carry name +
+datatype + value), birth-rebirth + bdseq + edge-node-descriptor aliases,
+NCMD/DCMD metric-name presence + metric-value compatibility, Template
+Instance pass-throughs (cross-ref deferred), NDEATH publisher SHOULD
+aliases, and `tck-id-topics-nbirth-templates` presence:
+```
+tck-id-topics-{nbirth,dbirth}-{metrics,metric-reqs}
+tck-id-topics-nbirth-{rebirth-metric,templates,bdseq-increment}
+tck-id-payloads-nbirth-{rebirth-req,bdseq-repeat,edge-node-descriptor}
+tck-id-payloads-template-instance-{members,members-birth,members-data,parameters}
+tck-id-payloads-ndeath-will-message-publisher{,-disconnect-mqtt311,-disconnect-mqtt50}
+tck-id-operational-behavior-data-commands-{ncmd,dcmd}-{metric-name,metric-value}
+```
+
+221 of 274. Many of the remaining assertions reduce to additional
 `messageRule` entries (see `internal/assertions/message_rules.go`).
 
 ## Regenerating the catalog
@@ -279,6 +293,7 @@ Set `SPARKPLUG_SPEC_REF` to pin a tag instead of `master`.
 - [x] Second batch: DBIRTH/NDATA/DDATA/DDEATH envelope + ordering (17)
 - [x] Third batch: host STATE envelope/topic + rebirth metric (20)
 - [x] Fourth batch: data-publish + template-definition + UTC + NCMD rebirth (27)
+- [x] Fifth batch: birth-metric + template-instance + cmd-metric aliases (21)
 - [ ] Remaining payload-level checks (~80 mechanical)
 - [ ] Alias rules + sequencing checks not yet covered
 - [ ] Edge-node profile parity with HiveMQ TCK
