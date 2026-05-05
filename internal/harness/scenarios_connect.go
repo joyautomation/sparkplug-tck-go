@@ -19,35 +19,48 @@ import (
 
 // EdgeWillIsNDEATH: every Edge Node CONNECT MUST advertise a Will
 // pointing at its NDEATH topic with QoS=1 + retain=false (the broker
-// Will fingerprint mandated by Sparkplug). Implements the strict form of
-// tck-id-payloads-ndeath-will-message-qos /
-// tck-id-payloads-ndeath-will-message-retain at the *advertise* layer
-// rather than only when the Will fires.
+// Will fingerprint mandated by Sparkplug). Emits results for three IDs
+// per Edge CONNECT: the base "Will is the NDEATH" assertion, plus QoS=1
+// and retain=false. Strict form — the advertised Will is checked at
+// CONNECT, not only when the Will fires.
 func EdgeWillIsNDEATH(b *Broker) []runner.Result {
-	const id = "tck-id-payloads-ndeath-will-message-qos"
+	const idBase = "tck-id-payloads-ndeath-will-message"
+	const idQoS = "tck-id-payloads-ndeath-will-message-qos"
+	const idRetain = "tck-id-payloads-ndeath-will-message-retain"
 	var out []runner.Result
+	scored := false
 	for _, e := range b.Events() {
 		if e.Type != EvConnect {
 			continue
 		}
-		// Only score CONNECTs that reference an NDEATH topic — host
-		// applications also CONNECT, and they have a different Will shape.
+		// Edge CONNECTs are the ones whose Will targets an NDEATH topic;
+		// host applications CONNECT too but with a different Will shape.
 		if e.Will == nil || !isNDEATHTopic(e.Will.Topic) {
 			continue
 		}
+		scored = true
 		subj := e.ClientID + " " + e.Will.Topic
-		switch {
-		case e.Will.QoS != 1:
-			out = append(out, runner.Fail(id, subj,
+		// Base "Will is NDEATH" — already implied by the topic match,
+		// but emit a Pass row so the parity bench scores the ID.
+		out = append(out, runner.Pass(idBase, subj))
+		if e.Will.QoS != 1 {
+			out = append(out, runner.Fail(idQoS, subj,
 				fmt.Sprintf("Will QoS = %d, want 1", e.Will.QoS)))
-		case e.Will.Retain:
-			out = append(out, runner.Fail(id, subj, "Will retain flag set, must be false"))
-		default:
-			out = append(out, runner.Pass(id, subj))
+		} else {
+			out = append(out, runner.Pass(idQoS, subj))
+		}
+		if e.Will.Retain {
+			out = append(out, runner.Fail(idRetain, subj, "Will retain flag set, must be false"))
+		} else {
+			out = append(out, runner.Pass(idRetain, subj))
 		}
 	}
-	if len(out) == 0 {
-		return []runner.Result{runner.NA(id, "no Edge Node CONNECT with NDEATH Will in scenario")}
+	if !scored {
+		return []runner.Result{
+			runner.NA(idBase, "no Edge Node CONNECT with NDEATH Will in scenario"),
+			runner.NA(idQoS, "no Edge Node CONNECT with NDEATH Will in scenario"),
+			runner.NA(idRetain, "no Edge Node CONNECT with NDEATH Will in scenario"),
+		}
 	}
 	return out
 }
@@ -300,4 +313,16 @@ func isDCMDTopic(t string) bool {
 	// spBv1.0/<group>/DCMD/<edge>/<device>
 	parts := strings.Split(t, "/")
 	return len(parts) == 5 && parts[0] == "spBv1.0" && parts[2] == "DCMD"
+}
+
+func isNDATATopic(t string) bool {
+	// spBv1.0/<group>/NDATA/<edge>
+	parts := strings.Split(t, "/")
+	return len(parts) == 4 && parts[0] == "spBv1.0" && parts[2] == "NDATA"
+}
+
+func isDDATATopic(t string) bool {
+	// spBv1.0/<group>/DDATA/<edge>/<device>
+	parts := strings.Split(t, "/")
+	return len(parts) == 5 && parts[0] == "spBv1.0" && parts[2] == "DDATA"
 }

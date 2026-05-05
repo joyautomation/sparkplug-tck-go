@@ -80,8 +80,15 @@ func TestEdgeWillIsNDEATH_Pass(t *testing.T) {
 
 	for _, fn := range []Scenario{EdgeWillIsNDEATH, EdgeWillPayloadHasBdSeq} {
 		res := fn(b)
-		if len(res) != 1 || res[0].Status != runner.StatusPass {
-			t.Errorf("expected pass, got %+v", res)
+		if len(res) == 0 {
+			t.Errorf("expected at least one result, got none")
+			continue
+		}
+		for _, r := range res {
+			if r.Status != runner.StatusPass {
+				t.Errorf("expected pass, got %+v", res)
+				break
+			}
 		}
 	}
 }
