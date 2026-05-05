@@ -6,7 +6,7 @@ The official TCK is a Java/HiveMQ stack: ~10s JVM warmup, heavyweight to run as 
 
 ## Status
 
-Early but executable. Assertion catalog is extracted; the runner, session tracker, MQTT capture, and 54 of 274 assertions are wired. The CLI runs against either a JSON fixture or a live MQTT broker.
+Early but executable. Assertion catalog is extracted; the runner, session tracker, MQTT capture, and 60 of 274 assertions are wired. The CLI runs against either a JSON fixture or a live MQTT broker.
 
 ## Parity strategy
 
@@ -71,8 +71,18 @@ tck-id-payloads-ndeath-bdseq
 tck-id-payloads-ndeath-will-message-qos
 tck-id-payloads-ndeath-will-message-retain
 tck-id-payloads-sequence-num-incrementing
+tck-id-payloads-sequence-num-always-included
+tck-id-payloads-sequence-num-req-nbirth
 tck-id-topics-nbirth-bdseq-included
 tck-id-topics-nbirth-bdseq-matching
+```
+
+Per-metric structural rules (datatype + name):
+```
+tck-id-payloads-metric-datatype-req
+tck-id-payloads-metric-datatype-value
+tck-id-payloads-metric-datatype-value-type
+tck-id-payloads-name-requirement
 ```
 
 DBIRTH / DDATA / DDEATH / NDATA envelope (QoS, retain, seq, timestamp):
@@ -134,7 +144,7 @@ tck-id-operational-behavior-data-commands-rebirth-datatype
 tck-id-operational-behavior-data-commands-rebirth-name-aliases
 ```
 
-54 of 274. Many of the remaining assertions reduce to additional
+60 of 274. Many of the remaining assertions reduce to additional
 `messageRule` entries (see `internal/assertions/message_rules.go`).
 
 ## Regenerating the catalog

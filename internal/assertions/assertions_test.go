@@ -17,8 +17,9 @@ func str(v string) *string { return &v }
 
 func bdSeqMetric(v uint64) *spbpb.Payload_Metric {
 	return &spbpb.Payload_Metric{
-		Name:  str("bdSeq"),
-		Value: &spbpb.Payload_Metric_LongValue{LongValue: v},
+		Name:     str("bdSeq"),
+		Datatype: u32(uint32(spbpb.DataType_UInt64)),
+		Value:    &spbpb.Payload_Metric_LongValue{LongValue: v},
 	}
 }
 

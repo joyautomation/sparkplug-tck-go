@@ -30,6 +30,43 @@ func init() {
 	// chapter 4 alias for the NDEATH/NBIRTH bdSeq matching requirement.
 	runner.Register(runner.Assertion{ID: "tck-id-topics-nbirth-bdseq-matching", Run: ndeathBdSeqMatchesAlias("tck-id-topics-nbirth-bdseq-matching")})
 	runner.Register(runner.Assertion{ID: "tck-id-payloads-sequence-num-incrementing", Run: seqIncrementing})
+	runner.Register(runner.Assertion{ID: "tck-id-payloads-sequence-num-always-included", Run: seqAlwaysIncluded})
+	// chapter alias for the NBIRTH-seq presence/range requirement.
+	runner.Register(runner.Assertion{ID: "tck-id-payloads-sequence-num-req-nbirth", Run: nbirthSeqAlias("tck-id-payloads-sequence-num-req-nbirth")})
+}
+
+func nbirthSeqAlias(aliasID string) runner.AssertionFn {
+	return func(c *runner.Capture) []runner.Result {
+		results := nbirthSeqPayload(c)
+		for i := range results {
+			results[i].AssertionID = aliasID
+		}
+		return results
+	}
+}
+
+// seqAlwaysIncluded: every Sparkplug edge message except NDEATH must carry
+// a sequence number. NDEATH is excluded by spec; STATE is host-application,
+// not edge.
+func seqAlwaysIncluded(c *runner.Capture) []runner.Result {
+	const id = "tck-id-payloads-sequence-num-always-included"
+	var out []runner.Result
+	for _, m := range c.Messages {
+		switch m.Topic.Type {
+		case spb.NDEATH, spb.STATE:
+			continue
+		}
+		subject := subjectFor(m)
+		if m.Payload == nil || m.Payload.Seq == nil {
+			out = append(out, runner.Fail(id, subject, fmt.Sprintf("%s missing seq", m.Topic.Type)))
+		} else {
+			out = append(out, runner.Pass(id, subject))
+		}
+	}
+	if len(out) == 0 {
+		return []runner.Result{runner.NA(id, "no edge messages in capture")}
+	}
+	return out
 }
 
 // tck-id-topic-structure-namespace-a:

@@ -23,8 +23,9 @@ func TestEndToEnd_GoldenCompliant(t *testing.T) {
 	u32 := func(v uint32) *uint32 { return &v }
 	bdSeq := func(v uint64) *spbpb.Payload_Metric {
 		return &spbpb.Payload_Metric{
-			Name:  str("bdSeq"),
-			Value: &spbpb.Payload_Metric_LongValue{LongValue: v},
+			Name:     str("bdSeq"),
+			Datatype: u32(uint32(spbpb.DataType_UInt64)),
+			Value:    &spbpb.Payload_Metric_LongValue{LongValue: v},
 		}
 	}
 	rebirth := func() *spbpb.Payload_Metric {
