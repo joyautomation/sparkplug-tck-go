@@ -17,7 +17,7 @@ func TestEdgeNodeProfile_Pass(t *testing.T) {
 	c := connectEdge(t, b, "edge-good", "spBv1.0/G/NDEATH/N")
 	c.Subscribe("spBv1.0/G/NCMD/N", 1, nil).WaitTimeout(2 * time.Second)
 	c.Subscribe("spBv1.0/G/DCMD/N/D", 1, nil).WaitTimeout(2 * time.Second)
-	c.Publish("spBv1.0/G/NDEATH/N", 0, false, []byte("ndeath")).
+	c.Publish("spBv1.0/G/NDEATH/N", 0, false, edgeWill(0)).
 		WaitTimeout(2 * time.Second)
 	c.Disconnect(200)
 	time.Sleep(100 * time.Millisecond)

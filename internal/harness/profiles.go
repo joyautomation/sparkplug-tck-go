@@ -41,6 +41,13 @@ var EdgeNodeProfile = Profile{
 		EdgeRebirthHaltsData,
 		EdgeRebirthBdSeqUnchanged,
 		EdgeDDEATHCompliant,
+		EdgeNBIRTHCompliant,
+		EdgeDBIRTHCompliant,
+		EdgeBirthOrdering,
+		EdgeMessageMetricsTimestamp,
+		EdgeNDEATHCompliant,
+		EdgeCleanSession,
+		EdgeBirthMetricNaming,
 	},
 }
 
