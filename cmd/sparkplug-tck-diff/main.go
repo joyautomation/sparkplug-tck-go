@@ -27,6 +27,13 @@ type javaReport struct {
 	Overall  string         `json:"overall"`
 }
 
+// javaMulti is the multi-test JSON shape sparkplug-tck-correctness emits
+// when run with -tests; the single-test shape (one javaReport) is
+// recognized for backwards compat.
+type javaMulti struct {
+	Tests []javaReport `json:"tests"`
+}
+
 type javaVerdict struct {
 	ID     string `json:"id"`
 	Status string `json:"status"`
@@ -54,7 +61,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	jr, err := loadJava(*javaPath)
+	javaTests, err := loadJava(*javaPath)
 	if err != nil {
 		die("load java: %v", err)
 	}
@@ -63,33 +70,41 @@ func main() {
 		die("load go: %v", err)
 	}
 
-	rows := buildRows(jr, gr)
-	sort.Slice(rows, func(i, j int) bool { return rows[i].ID < rows[j].ID })
-
-	totals := count(rows)
-
 	if *jsonOut {
-		emitJSON(rows, totals, jr.Test, jr.Overall)
+		emitJSONMulti(javaTests, gr)
 	} else {
-		emitMarkdown(rows, totals, jr.Test, jr.Overall)
+		emitMarkdownMulti(javaTests, gr)
 	}
 
-	fmt.Fprintf(os.Stderr,
-		"%s — agree:%d disagree:%d (java only:%d, go only:%d, both empty:%d) — agreement %.1f%%\n",
-		jr.Test, totals.agree, totals.disagree, totals.javaOnly, totals.goOnly, totals.bothEmpty,
-		percent(totals.agree, totals.agree+totals.disagree))
+	for _, jr := range javaTests {
+		rows := buildRows(jr, gr)
+		t := count(rows)
+		fmt.Fprintf(os.Stderr,
+			"%s — agree:%d disagree:%d (java only:%d, go only:%d) — agreement %.1f%%\n",
+			jr.Test, t.agree, t.disagree, t.javaOnly, t.goOnly,
+			percent(t.agree, t.agree+t.disagree))
+	}
 }
 
-func loadJava(path string) (javaReport, error) {
+// loadJava accepts either the multi-test shape `{tests: [...]}` or the
+// single-test shape (one javaReport) and normalizes to a slice.
+func loadJava(path string) ([]javaReport, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return javaReport{}, err
+		return nil, err
 	}
-	var jr javaReport
-	if err := json.Unmarshal(raw, &jr); err != nil {
-		return javaReport{}, err
+	var multi javaMulti
+	if err := json.Unmarshal(raw, &multi); err == nil && len(multi.Tests) > 0 {
+		return multi.Tests, nil
 	}
-	return jr, nil
+	var single javaReport
+	if err := json.Unmarshal(raw, &single); err != nil {
+		return nil, err
+	}
+	if single.Test == "" {
+		return nil, fmt.Errorf("%s has neither tests[] nor a single test report", path)
+	}
+	return []javaReport{single}, nil
 }
 
 func loadGo(path string) (goReport, error) {
@@ -191,55 +206,108 @@ func percent(num, denom int) float64 {
 	return float64(num) * 100.0 / float64(denom)
 }
 
-func emitMarkdown(rows []row, t totals, test, overall string) {
-	fmt.Printf("# Sparkplug TCK correctness diff — %s\n\n", test)
-	fmt.Printf("Java overall: `%s`\n\n", overall)
-	fmt.Printf("Both engines emit a verdict on %d IDs; %d agree, %d disagree (%.1f%%).\n",
-		t.agree+t.disagree, t.agree, t.disagree, percent(t.agree, t.agree+t.disagree))
-	fmt.Printf("Java-only IDs (Go has no scenario): %d. Go-only IDs (Java didn't track in this test): %d.\n\n",
-		t.javaOnly, t.goOnly)
-	fmt.Println("| ID | Java | Go | Agree |")
-	fmt.Println("| --- | --- | --- | --- |")
+func emitMarkdownMulti(javaTests []javaReport, gr goReport) {
+	fmt.Println("# Sparkplug TCK correctness diff")
+	fmt.Println()
+	fmt.Println("Per-ID verdicts where both engines emitted a result for the same upstream test class. \"Agree\" counts only IDs both sides scored.")
+	fmt.Println()
+	fmt.Println("| Test | Both | Agree | Disagree | Agreement | Java-only | Go-only |")
+	fmt.Println("| --- | --- | --- | --- | --- | --- | --- |")
+	var totalAgree, totalDisagree int
+	for _, jr := range javaTests {
+		rows := buildRows(jr, gr)
+		t := count(rows)
+		totalAgree += t.agree
+		totalDisagree += t.disagree
+		fmt.Printf("| %s | %d | %d | %d | %.1f%% | %d | %d |\n",
+			jr.Test, t.agree+t.disagree, t.agree, t.disagree,
+			percent(t.agree, t.agree+t.disagree), t.javaOnly, t.goOnly)
+	}
+	fmt.Printf("| **all** | **%d** | **%d** | **%d** | **%.1f%%** | — | — |\n",
+		totalAgree+totalDisagree, totalAgree, totalDisagree,
+		percent(totalAgree, totalAgree+totalDisagree))
+	fmt.Println()
+	for _, jr := range javaTests {
+		rows := buildRows(jr, gr)
+		sort.Slice(rows, func(i, j int) bool { return rows[i].ID < rows[j].ID })
+		emitTestSection(jr, rows)
+	}
+}
+
+func emitTestSection(jr javaReport, rows []row) {
+	fmt.Printf("## %s\n\n", jr.Test)
+	fmt.Printf("Java overall: `%s`\n\n", jr.Overall)
+	// Only render disagreements + Java-only — they're the actionable rows.
+	var actionable []row
 	for _, r := range rows {
-		mark := "✗"
 		if r.Agree {
-			mark = "✓"
-		} else if r.Java == "" || r.Go == "" {
-			mark = "·"
+			continue
 		}
+		if r.Java == "" {
+			continue // Go-only: scenario covers something Java doesn't track here, fine.
+		}
+		actionable = append(actionable, r)
+	}
+	if len(actionable) == 0 {
+		fmt.Println("_No disagreements or Java-only IDs._")
+		fmt.Println()
+		return
+	}
+	fmt.Println("| ID | Java | Go | Note |")
+	fmt.Println("| --- | --- | --- | --- |")
+	for _, r := range actionable {
 		j := r.Java
-		if j == "" {
-			j = "—"
-		}
 		g := r.Go
 		if g == "" {
 			g = "—"
 		}
-		fmt.Printf("| %s | %s | %s | %s |\n", r.ID, j, g, mark)
+		note := "disagree"
+		if r.Go == "" {
+			note = "java-only (Go harness has no scenario)"
+		}
+		fmt.Printf("| %s | %s | %s | %s |\n", r.ID, j, g, note)
 	}
+	fmt.Println()
 }
 
-func emitJSON(rows []row, t totals, test, overall string) {
-	type out struct {
-		Test       string `json:"test"`
-		Overall    string `json:"overall"`
-		Agree      int    `json:"agree"`
-		Disagree   int    `json:"disagree"`
-		JavaOnly   int    `json:"java_only"`
-		GoOnly     int    `json:"go_only"`
-		Agreement  string `json:"agreement_pct"`
-		Rows       []row  `json:"rows"`
+func emitJSONMulti(javaTests []javaReport, gr goReport) {
+	type perTest struct {
+		Test      string `json:"test"`
+		Overall   string `json:"overall"`
+		Agree     int    `json:"agree"`
+		Disagree  int    `json:"disagree"`
+		JavaOnly  int    `json:"java_only"`
+		GoOnly    int    `json:"go_only"`
+		Agreement string `json:"agreement_pct"`
+		Rows      []row  `json:"rows"`
 	}
-	o := out{
-		Test: test, Overall: overall,
-		Agree: t.agree, Disagree: t.disagree,
-		JavaOnly: t.javaOnly, GoOnly: t.goOnly,
-		Agreement: fmt.Sprintf("%.1f", percent(t.agree, t.agree+t.disagree)),
-		Rows:      rows,
+	type combined struct {
+		Tests   []perTest `json:"tests"`
+		Overall struct {
+			Agree     int    `json:"agree"`
+			Disagree  int    `json:"disagree"`
+			Agreement string `json:"agreement_pct"`
+		} `json:"overall"`
 	}
+	var c combined
+	for _, jr := range javaTests {
+		rows := buildRows(jr, gr)
+		sort.Slice(rows, func(i, j int) bool { return rows[i].ID < rows[j].ID })
+		t := count(rows)
+		c.Tests = append(c.Tests, perTest{
+			Test: jr.Test, Overall: jr.Overall,
+			Agree: t.agree, Disagree: t.disagree,
+			JavaOnly: t.javaOnly, GoOnly: t.goOnly,
+			Agreement: fmt.Sprintf("%.1f", percent(t.agree, t.agree+t.disagree)),
+			Rows:      rows,
+		})
+		c.Overall.Agree += t.agree
+		c.Overall.Disagree += t.disagree
+	}
+	c.Overall.Agreement = fmt.Sprintf("%.1f", percent(c.Overall.Agree, c.Overall.Agree+c.Overall.Disagree))
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	_ = enc.Encode(o)
+	_ = enc.Encode(c)
 }
 
 // MarshalJSON ensures the row's `Agree` field is named for stable JSON

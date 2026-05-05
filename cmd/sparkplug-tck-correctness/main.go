@@ -1,16 +1,17 @@
-// Command sparkplug-tck-correctness drives a synthetic SUT through the
+// Command sparkplug-tck-correctness drives synthetic SUTs through the
 // upstream Java TCK (running as a HiveMQ extension on localhost:1883)
-// and captures per-ID verdicts. Pair with the Go bench's harness output
-// to diff per-ID agreement — see scripts/upstream-tck/README.md.
+// and captures per-ID verdicts for each named test class. Pair with the
+// Go bench's harness output to diff per-ID agreement — see
+// scripts/upstream-tck/README.md.
 //
 // Prereqs: HiveMQ + Sparkplug TCK extension running on the broker URL,
 // staged by gradle :tck:prepareHivemqHome and booted by
 // scripts/upstream-tck/start-hivemq.sh.
 //
-// Output is JSON (per-ID verdicts) on stdout plus a one-line summary
-// on stderr. The Java TCK additionally writes SparkplugTCKresults.log
-// in the HiveMQ working directory; we capture results live off MQTT
-// and don't depend on that file.
+// Output is JSON (one report per test) on stdout plus a one-line
+// summary per test on stderr. The Java TCK additionally writes
+// SparkplugTCKresults.log in the HiveMQ working directory; we capture
+// results live off MQTT and don't depend on that file.
 package main
 
 import (
@@ -26,6 +27,16 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/joyautomation/sparkplug-tck-go/internal/spbpb"
+)
+
+// driverKind picks which synthetic SUT lifecycle the orchestrator drives
+// for a given test. Edge tests need a Sparkplug edge node; host tests
+// need a Sparkplug Host Application publishing STATE.
+type driverKind string
+
+const (
+	driverEdge driverKind = "edge"
+	driverHost driverKind = "host"
 )
 
 const (
@@ -55,21 +66,25 @@ type counts struct {
 	Total       int `json:"total"`
 }
 
+// defaultTestSet is the small spread the bench uses out-of-the-box —
+// covers both SUT profiles and an "edge data" path so we sample more
+// than the session-handshake corner of the spec.
+const defaultTestSet = "edge SessionEstablishmentTest,edge SendDataTest,host SessionEstablishmentTest"
+
 func main() {
 	broker := flag.String("broker", "tcp://localhost:1883", "MQTT broker URL (HiveMQ + TCK extension)")
-	test := flag.String("test", "edge SessionEstablishmentTest", "TCK test as 'profile TestClass' (e.g. 'edge SessionEstablishmentTest')")
-	hostID := flag.String("host", "TCKHost", "Primary Host Application ID for the test")
-	groupID := flag.String("group", "TCKGroup", "Sparkplug Group ID")
-	edgeID := flag.String("edge", "TCKEdge", "Sparkplug Edge Node ID")
-	deviceID := flag.String("device", "TCKDevice", "Sparkplug Device ID(s), space-separated")
+	tests := flag.String("tests", defaultTestSet, "comma-separated TCK tests as 'profile TestClass' (e.g. 'edge SessionEstablishmentTest')")
+	hostID := flag.String("host", "TCKHost", "Primary Host Application ID for tests that take one")
+	groupID := flag.String("group", "TCKGroup", "Sparkplug Group ID for edge tests")
+	edgeID := flag.String("edge", "TCKEdge", "Sparkplug Edge Node ID prefix for edge tests")
+	deviceID := flag.String("device", "TCKDevice", "Sparkplug Device ID for edge tests")
 	timeout := flag.Duration("timeout", 60*time.Second, "max wall-clock for one test")
 	flag.Parse()
 
-	parts := strings.SplitN(*test, " ", 2)
-	if len(parts) != 2 {
-		fail("-test must be 'profile TestClass'")
+	specs := splitTests(*tests)
+	if len(specs) == 0 {
+		fail("no tests requested")
 	}
-	profile, testName := parts[0], parts[1]
 
 	ctrl := newCollector()
 	if err := ctrl.connect(*broker); err != nil {
@@ -77,25 +92,83 @@ func main() {
 	}
 	defer ctrl.close()
 
-	if err := ctrl.startTest(profile, testName, *hostID, *groupID, *edgeID, strings.Fields(*deviceID)); err != nil {
-		fail("start test: %v", err)
+	reports := make([]report, 0, len(specs))
+	for i, spec := range specs {
+		profile, testName, err := parseSpec(spec)
+		if err != nil {
+			fail("test %d: %v", i, err)
+		}
+
+		// Each test gets fresh collector state so verdicts don't bleed.
+		ctrl.reset()
+
+		// Use unique edge/host IDs per run so the TCK extension never
+		// thinks "this SUT was already seen this session" — the second
+		// run after that diagnosis would otherwise time out.
+		runEdge := fmt.Sprintf("%s%d", *edgeID, i)
+		runHost := fmt.Sprintf("%s%d", *hostID, i)
+
+		var args []string
+		var driver func()
+		switch driverKindFor(profile, testName) {
+		case driverEdge:
+			args = []string{runHost, *groupID, runEdge, *deviceID}
+			driver = func() { driveCompliantEdge(*broker, runHost, *groupID, runEdge, *deviceID) }
+		case driverHost:
+			args = []string{runHost}
+			driver = func() { driveCompliantHost(*broker, runHost) }
+		}
+
+		if err := ctrl.startTest(profile, testName, args); err != nil {
+			fail("start %s: %v", spec, err)
+		}
+		go driver()
+
+		if err := ctrl.waitForOverall(*timeout); err != nil {
+			fmt.Fprintf(os.Stderr, "%s — TIMEOUT after %s, partial results captured\n", spec, *timeout)
+		}
+		_ = ctrl.endTest()
+
+		rep := ctrl.report(profile + "/" + testName)
+		reports = append(reports, rep)
+		fmt.Fprintf(os.Stderr, "%s — pass:%d fail:%d not_executed:%d other:%d (overall %s)\n",
+			rep.Test, rep.Counts.Pass, rep.Counts.Fail, rep.Counts.NotExecuted, rep.Counts.Other, rep.Overall)
 	}
 
-	// Drive a compliant edge lifecycle while the test is active.
-	go driveCompliantEdge(*broker, *hostID, *groupID, *edgeID, *deviceID)
-
-	if err := ctrl.waitForOverall(*timeout); err != nil {
-		fail("wait results: %v", err)
-	}
-	_ = ctrl.endTest()
-
-	rep := ctrl.report(profile + "/" + testName)
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	_ = enc.Encode(rep)
+	_ = enc.Encode(struct {
+		Tests []report `json:"tests"`
+	}{reports})
+}
 
-	fmt.Fprintf(os.Stderr, "%s — pass:%d fail:%d not_executed:%d other:%d (overall %s)\n",
-		rep.Test, rep.Counts.Pass, rep.Counts.Fail, rep.Counts.NotExecuted, rep.Counts.Other, rep.Overall)
+func splitTests(s string) []string {
+	var out []string
+	for _, t := range strings.Split(s, ",") {
+		t = strings.TrimSpace(t)
+		if t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+func parseSpec(s string) (profile, testName string, err error) {
+	parts := strings.Fields(s)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("expected 'profile TestClass', got %q", s)
+	}
+	return parts[0], parts[1], nil
+}
+
+// driverKindFor maps a test spec to which SUT lifecycle to run. Tests
+// in the host/* tree need a host SUT; everything else (edge/*) needs
+// an edge node.
+func driverKindFor(profile, _ string) driverKind {
+	if profile == "host" {
+		return driverHost
+	}
+	return driverEdge
 }
 
 // collector subscribes to TCK result topics, parses lines, and waits
@@ -113,17 +186,25 @@ func newCollector() *collector {
 }
 
 func (c *collector) connect(url string) error {
+	// Route via DefaultPublishHandler — paho's per-subscription callbacks
+	// get bypassed in a way we couldn't pin down on this broker, so the
+	// safe path is one global handler that dispatches by topic.
 	opts := mqtt.NewClientOptions().
 		AddBroker(url).
-		SetClientID("sparkplug-tck-correctness").
+		SetClientID(fmt.Sprintf("sparkplug-tck-correctness-%d", time.Now().UnixNano())).
 		SetCleanSession(true).
-		SetConnectTimeout(5 * time.Second)
+		SetConnectTimeout(5 * time.Second).
+		SetDefaultPublishHandler(func(cli mqtt.Client, msg mqtt.Message) {
+			if msg.Topic() == topicResults {
+				c.onResult(cli, msg)
+			}
+		})
 	c.c = mqtt.NewClient(opts)
 	tok := c.c.Connect()
 	if !tok.WaitTimeout(5*time.Second) || tok.Error() != nil {
 		return fmt.Errorf("connect: %v", tok.Error())
 	}
-	if tok := c.c.Subscribe(topicResults, 1, c.onResult); !tok.WaitTimeout(2*time.Second) || tok.Error() != nil {
+	if tok := c.c.Subscribe(topicResults, 1, nil); !tok.WaitTimeout(2*time.Second) || tok.Error() != nil {
 		return fmt.Errorf("sub results: %v", tok.Error())
 	}
 	if tok := c.c.Subscribe(topicLog, 1, nil); !tok.WaitTimeout(2*time.Second) || tok.Error() != nil {
@@ -132,17 +213,29 @@ func (c *collector) connect(url string) error {
 	return nil
 }
 
-func (c *collector) startTest(profile, name, host, group, edge string, devices []string) error {
-	args := []string{"NEW_TEST", profile, name, host, group, edge}
-	args = append(args, devices...)
-	payload := strings.Join(args, " ")
+// startTest publishes a NEW_TEST command to the TCK extension and gives
+// it a moment to wire interceptors before the synthetic SUT connects.
+// `args` is the test-specific positional list (e.g. "host group edge
+// device" for edge tests, "host" for host tests).
+func (c *collector) startTest(profile, name string, args []string) error {
+	parts := append([]string{"NEW_TEST", profile, name}, args...)
+	payload := strings.Join(parts, " ")
 	tok := c.c.Publish(topicTestControl, 1, false, payload)
 	if !tok.WaitTimeout(2*time.Second) || tok.Error() != nil {
 		return fmt.Errorf("publish NEW_TEST: %v", tok.Error())
 	}
-	// Give the extension a moment to wire interceptors before SUT connects.
 	time.Sleep(500 * time.Millisecond)
 	return nil
+}
+
+// reset clears collector state between test runs so verdicts from
+// run N don't leak into run N+1.
+func (c *collector) reset() {
+	c.mu.Lock()
+	c.verdicts = nil
+	c.overall = ""
+	c.overallC = make(chan struct{})
+	c.mu.Unlock()
 }
 
 func (c *collector) endTest() error {
@@ -245,10 +338,10 @@ func (c *collector) close() {
 // driveCompliantEdge runs a minimal-but-spec-compliant edge node
 // lifecycle: NDEATH Will + bdSeq, NBIRTH (bdSeq + Node Control/Rebirth +
 // timestamp + seq=0), per-device DBIRTH (seq=1+), NDATA, DDATA, DDEATH,
-// NDEATH on disconnect. Enough for the SessionEstablishmentTest to
-// reach a verdict on every assertion ID it tracks.
+// NDEATH on disconnect. Enough for SessionEstablishment / SendData to
+// reach a verdict on every assertion ID they track.
 func driveCompliantEdge(broker, _, group, edge, device string) {
-	clientID := "tck-correctness-edge"
+	clientID := "tck-correctness-edge-" + edge
 	willTopic := fmt.Sprintf("spBv1.0/%s/NDEATH/%s", group, edge)
 
 	bdSeq := uint64(0)
@@ -300,6 +393,82 @@ func driveCompliantEdge(broker, _, group, edge, device string) {
 	seq++
 	c.Publish(fmt.Sprintf("spBv1.0/%s/NDEATH/%s", group, edge), 0, false,
 		bdSeqPayload(bdSeq)).WaitTimeout(2 * time.Second)
+}
+
+// driveCompliantHost runs a Sparkplug Host Application lifecycle.
+// host/SessionEstablishmentTest after receiving the host's BIRTH publishes
+// a fake `online:false` STATE provocation and waits for the host to
+// republish its BIRTH ("resend good"); only then does it emit OVERALL.
+// We mimic that: subscribe namespace+STATE, publish BIRTH (timestamp
+// MUST match the will payload), watch the STATE topic, and republish
+// BIRTH with a fresh timestamp when the TCK's offline provocation arrives.
+func driveCompliantHost(broker, host string) {
+	clientID := "tck-correctness-host-" + host
+	stateTopic := fmt.Sprintf("spBv1.0/STATE/%s", host)
+	// The spec requires the BIRTH timestamp to equal the WILL/Death timestamp,
+	// so reuse the same value for both.
+	birthTS := time.Now().UnixMilli()
+	willBody, _ := json.Marshal(map[string]any{"online": false, "timestamp": birthTS})
+	birthBody, _ := json.Marshal(map[string]any{"online": true, "timestamp": birthTS})
+
+	var (
+		mu        sync.Mutex
+		responded bool
+		client    mqtt.Client
+	)
+
+	onState := func(_ mqtt.Client, msg mqtt.Message) {
+		var s struct {
+			Online    bool  `json:"online"`
+			Timestamp int64 `json:"timestamp"`
+		}
+		if err := json.Unmarshal(msg.Payload(), &s); err != nil {
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if responded || client == nil || s.Online {
+			return
+		}
+		// Respond to the TCK's offline provocation with a fresh BIRTH.
+		responded = true
+		ts := time.Now().UnixMilli()
+		body, _ := json.Marshal(map[string]any{"online": true, "timestamp": ts})
+		client.Publish(stateTopic, 1, true, body)
+	}
+
+	opts := mqtt.NewClientOptions().
+		AddBroker(broker).
+		SetClientID(clientID).
+		SetCleanSession(true).
+		SetConnectTimeout(5 * time.Second).
+		SetBinaryWill(stateTopic, willBody, 1, true).
+		SetDefaultPublishHandler(func(cli mqtt.Client, msg mqtt.Message) {
+			if msg.Topic() == stateTopic {
+				onState(cli, msg)
+			}
+		})
+	c := mqtt.NewClient(opts)
+	if tok := c.Connect(); !tok.WaitTimeout(5*time.Second) || tok.Error() != nil {
+		return
+	}
+	defer c.Disconnect(200)
+	mu.Lock()
+	client = c
+	mu.Unlock()
+
+	// Spec requires the host to subscribe to BOTH the Sparkplug namespace
+	// (so it sees edge nodes) AND the STATE topic for its own birth/death
+	// before publishing — host SessionEstablishmentTest stays in
+	// CONNECTED state until both filters appear.
+	c.Subscribe("spBv1.0/#", 1, nil).WaitTimeout(2 * time.Second)
+	c.Subscribe(stateTopic, 1, nil).WaitTimeout(2 * time.Second)
+
+	c.Publish(stateTopic, 1, true, birthBody).WaitTimeout(2 * time.Second)
+
+	// Hold the session open long enough for the TCK to send its offline
+	// provocation and observe our BIRTH-resend before we DISCONNECT.
+	time.Sleep(5 * time.Second)
 }
 
 // --- payload builders ---
