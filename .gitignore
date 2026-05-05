@@ -1,0 +1,16 @@
+# Binaries
+/bin/
+/extract-assertions
+*.exe
+
+# Local spec checkout used by scripts/update-assertions.sh
+/.spec-cache/
+
+# Go
+*.test
+*.out
+coverage.txt
+
+# Editor
+.idea/
+.vscode/

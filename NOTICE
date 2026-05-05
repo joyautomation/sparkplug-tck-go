@@ -1,0 +1,10 @@
+sparkplug-tck-go
+Copyright 2026 Joy Automation
+
+This product includes software developed at Joy Automation (https://joyautomation.com/).
+
+This product redistributes excerpts from the Eclipse Sparkplug Specification
+(https://github.com/eclipse-sparkplug/sparkplug), which is licensed under the
+Eclipse Public License 2.0 (https://www.eclipse.org/legal/epl-2.0/). Specifically,
+the file `assertions.json` contains the normative text of testable assertions
+([tck-id-*]) extracted from the specification's asciidoc sources.

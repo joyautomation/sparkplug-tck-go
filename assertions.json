@@ -1,0 +1,1920 @@
+[
+  {
+    "id": "tck-id-case-sensitivity-metric-names",
+    "text": "An Edge Node SHOULD NOT publish metric names that when converted to all lower case match.",
+    "category": "case",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 68
+  },
+  {
+    "id": "tck-id-case-sensitivity-sparkplug-ids",
+    "text": "Edge Nodes in a Sparkplug environment SHOULD NOT have Sparkplug IDs (Group, Edge Node, or Device IDs) that when converted to lower case match",
+    "category": "case",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 63
+  },
+  {
+    "id": "tck-id-host-topic-phid-birth-message",
+    "text": "The first MQTT message a Host Application MUST publish is a Birth Certificate.",
+    "category": "host",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 523
+  },
+  {
+    "id": "tck-id-host-topic-phid-birth-payload",
+    "text": "The Birth Certificate Payload MUST be JSON UTF-8 data. It MUST include two key/value pairs where the one key MUST be 'online' and it's value is a boolean 'true'. The other key MUST be 'timestamp' and the value MUST be a numeric value representing the current UTC time in milliseconds since Epoch.",
+    "category": "host",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 562
+  },
+  {
+    "id": "tck-id-host-topic-phid-birth-payload-timestamp",
+    "text": "The timestamp metric value MUST be the same timestamp value set in the immediately prior MQTT CONNECT packet's Will Message payload.",
+    "category": "host",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 566
+  },
+  {
+    "id": "tck-id-host-topic-phid-birth-qos",
+    "text": "The MQTT Quality of Service (QoS) MUST be set to 1",
+    "category": "host",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 532
+  },
+  {
+    "id": "tck-id-host-topic-phid-birth-required",
+    "text": "The Sparkplug Host Application MUST publish a Sparkplug Host Application BIRTH message to the MQTT Server immediately after successfully subscribing its own spBv1.0/STATE/sparkplughostid topic.",
+    "category": "host",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 555
+  },
+  {
+    "id": "tck-id-host-topic-phid-birth-retain",
+    "text": "The MQTT retain flag for the Birth Certificate MUST be set to TRUE",
+    "category": "host",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 534
+  },
+  {
+    "id": "tck-id-host-topic-phid-birth-sub-required",
+    "text": "The Sparkplug Host Application MUST subscribe to its own spBv1.0/STATE/sparkplughostid and the appropriate spBv1.0 topic(s) immediately after successfully connecting to the MQTT Server.",
+    "category": "host",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 547
+  },
+  {
+    "id": "tck-id-host-topic-phid-birth-topic",
+    "text": "The Sparkplug Host Application Birth topic MUST be of the form spBv1.0/STATE/sparkplughostid where the sparkplughostid must be replaced with the specific Spakrplug Host ID of this Sparkplug Host Application.",
+    "category": "host",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 542
+  },
+  {
+    "id": "tck-id-host-topic-phid-death-payload",
+    "text": "The STATE Death Certificate Payload MUST be JSON UTF-8 data. It MUST include two key/value pairs where one key MUST be 'online' and it's value is a boolean 'false'. The other key MUST be 'timestamp' and the value MUST be a numeric value representing the current UTC time in milliseconds since Epoch.",
+    "category": "host",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 599
+  },
+  {
+    "id": "tck-id-host-topic-phid-death-payload-timestamp-connect",
+    "text": "The Death Certificate's used in the MQTT CONNECT packet Will message MUST use a timestamp value that represents the current UTC time at the time of the CONNECT packet is sent to the MQTT Server.",
+    "category": "host",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 603
+  },
+  {
+    "id": "tck-id-host-topic-phid-death-payload-timestamp-disconnect-clean",
+    "text": "If a Host Application is disconnecting cleanly using MQTT DISCONNECT packet, the Host Application MUST publish a Death Certificate payload before sending the MQTT DISCONNECT packet with the timestamp set to the current UTC time the disconnect is occurring.",
+    "category": "host",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 606
+  },
+  {
+    "id": "tck-id-host-topic-phid-death-payload-timestamp-disconnect-with-no-disconnect-packet",
+    "text": "If a Host Application is disconnecting and not using an MQTT DISCONNECT packet, the Host Application MUST publish a Death Certificate payload before terminating the MQTT connection with the timestamp set to the current UTC time the disconnect is occurring.",
+    "category": "host",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 610
+  },
+  {
+    "id": "tck-id-host-topic-phid-death-qos",
+    "text": "The MQTT Quality of Service (QoS) MUST be set to 1",
+    "category": "host",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 580
+  },
+  {
+    "id": "tck-id-host-topic-phid-death-required",
+    "text": "The Sparkplug Host Application MUST provide a Will message in the MQTT CONNECT packet",
+    "category": "host",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 592
+  },
+  {
+    "id": "tck-id-host-topic-phid-death-retain",
+    "text": "The MQTT retain flag for the Birth Certificate MUST be set to TRUE",
+    "category": "host",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 582
+  },
+  {
+    "id": "tck-id-host-topic-phid-death-topic",
+    "text": "The Sparkplug Host Application Death topic MUST be of the form spBv1.0/STATE/sparkplughostid where the sparkplughostid must be replaced with the specific Sparkplug Host ID of this Sparkplug Host Application.",
+    "category": "host",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 588
+  },
+  {
+    "id": "tck-id-message-flow-device-birth-publish-dbirth-match-edge-node-topic",
+    "text": "The Device's DBIRTH MQTT topic groupid and edgenodeid MUST match the groupid and edgenodeid that were sent in the prior NBIRTH message for the Edge Node this Device is associated with.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 419
+  },
+  {
+    "id": "tck-id-message-flow-device-birth-publish-dbirth-payload",
+    "text": "The Device's DBIRTH payload MUST be a Sparkplug Google Protobuf encoded payload.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 422
+  },
+  {
+    "id": "tck-id-message-flow-device-birth-publish-dbirth-payload-seq",
+    "text": "The Device's DBIRTH payload MUST include a 'seq' number that is between 0 and 255 (inclusive) and be one more than was included in the prior Sparkplug message sent from the Edge Node associated with this Device.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 428
+  },
+  {
+    "id": "tck-id-message-flow-device-birth-publish-dbirth-qos",
+    "text": "The Device's DBIRTH MQTT QoS MUST be 0.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 424
+  },
+  {
+    "id": "tck-id-message-flow-device-birth-publish-dbirth-retained",
+    "text": "The Device's DBIRTH retained flag MUST be set to false.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 426
+  },
+  {
+    "id": "tck-id-message-flow-device-birth-publish-dbirth-topic",
+    "text": "The Device's DBIRTH MQTT topic MUST be of the form 'spBv1.0/groupid/DBIRTH/edgenodeid/deviceid' where groupid is the Sparkplug Group ID the edgenodeid is the Sparkplug Edge Node ID and the deviceid is the Sparkplug Device ID for this Device.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 415
+  },
+  {
+    "id": "tck-id-message-flow-device-birth-publish-nbirth-wait",
+    "text": "The NBIRTH message MUST have been sent within the current MQTT session prior to a DBIRTH being published.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 412
+  },
+  {
+    "id": "tck-id-message-flow-device-dcmd-subscribe",
+    "text": "If the Device supports writing to outputs, the MQTT client associated with the Device MUST subscribe to a topic of the form 'spBv1.0/groupid/DCMD/edgenodeid/deviceid' where groupid is the Sparkplug Group ID the edgenodeid is the Sparkplug Edge Node ID and the deviceid is the Sparkplug Device ID for this Device. It MUST subscribe on this topic with a QoS of 1.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 403
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-connect",
+    "text": "Any Edge Node in the MQTT infrastructure MUST establish an MQTT Session prior to publishing NBIRTH and DBIRTH messages.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 167
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-nbirth-payload",
+    "text": "The Edge Node's NBIRTH payload MUST be a Sparkplug Google Protobuf encoded payload.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 222
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-nbirth-payload-bdSeq",
+    "text": "The Edge Node's NBIRTH payload MUST include a metric with the name of 'bdSeq' the datatype of INT64 and the value MUST be the same as the previous MQTT CONNECT packet.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 224
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-nbirth-payload-seq",
+    "text": "The Edge Node's NBIRTH payload MUST include a 'seq' number that is between 0 and 255 (inclusive).",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 231
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-nbirth-qos",
+    "text": "The Edge Node's NBIRTH MQTT QoS MUST be 0.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 227
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-nbirth-retained",
+    "text": "The Edge Node's NBIRTH retained flag MUST be set to false.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 229
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-nbirth-topic",
+    "text": "The Edge Node's NBIRTH MQTT topic MUST be of the form 'spBv1.0/groupid/NBIRTH/edgenodeid' where groupid is the Sparkplug Group ID and the edgenodeid is the Sparkplug Edge Node ID for this Edge Node",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 218
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-phid-offline",
+    "text": "If the Edge Node is configured to wait for a Primary Host Application, it is connected to the MQTT Server, and receives a STATE message on its configured Primary Host, the timestamp value in the payload is greater than or equal to the timestamp value included in the prior 'online' STATE message, and the 'online' value is false, it MUST immediately publish an NDEATH message and disconnect from the MQTT Server and start the connection establishment process over.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 235
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-phid-wait",
+    "text": "If the Edge Node is configured to wait for a Primary Host Application it MUST verify the Primary Host Application is online via the STATE topic before publishing NBIRTH and DBIRTH messages.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 201
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-phid-wait-id",
+    "text": "If the Edge Node is configured to wait for a Primary Host Application it MUST validate the Host Application ID as the last token in the STATE message topic string matches the configured Primary Host Application ID for this Edge Node.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 204
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-phid-wait-online",
+    "text": "If the Edge Node is configured to wait for a Primary Host Application it MUST validate the 'online' boolean flag is true in the STATE message payload before considering the Primary Host Application to be online and active.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 208
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-phid-wait-timestamp",
+    "text": "If the Edge Node is configured to wait for a Primary Host Application it MUST validate the timestamp value is greater than or equal to the previous STATE message timestamp value in the STATE message payload before considering the Primary Host Application to be online and active. If no previous STATE message timestamp value has been received by this Edge Node it MUST consider the incoming STATE message to be the latest/valid.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 212
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-will-message",
+    "text": "When a Sparkplug Edge Node sends its MQTT CONNECT packet, it MUST include a Will Message.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 170
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-will-message-payload",
+    "text": "The Edge Node's MQTT Will Message's payload MUST be a Sparkplug Google Protobuf encoded payload.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 176
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-will-message-payload-bdSeq",
+    "text": "The Edge Node's MQTT Will Message's payload MUST include a metric with the name of 'bdSeq', the datatype of INT64, and the value MUST be incremented by one from the value in the previous MQTT CONNECT packet unless the value would be greater than 255. If in the previous NBIRTH a value of 255 was sent, the next MQTT Connect packet Will Message payload bdSeq number value MUST have a value of 0.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 178
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-will-message-qos",
+    "text": "The Edge Node's MQTT Will Message's MQTT QoS MUST be 1.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 183
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-will-message-topic",
+    "text": "The Edge Node's MQTT Will Message's topic MUST be of the form 'spBv1.0/groupid/NDEATH/edgenodeid' where groupid is the Sparkplug Group ID and the edgenodeid is the Sparkplug Edge Node ID for this Edge Node",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 172
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-birth-publish-will-message-will-retained",
+    "text": "The Edge Node's MQTT Will Message's retained flag MUST be set to false.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 185
+  },
+  {
+    "id": "tck-id-message-flow-edge-node-ncmd-subscribe",
+    "text": "The MQTT client associated with the Edge Node MUST subscribe to a topic of the form 'spBv1.0/groupid/NCMD/edgenodeid' where groupid is the Sparkplug Group ID and the edgenodeid is the Sparkplug Edge Node ID for this Edge Node. It MUST subscribe on this topic with a QoS of 1.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 158
+  },
+  {
+    "id": "tck-id-message-flow-hid-sparkplug-state-message-delivered",
+    "text": "After publishing its own Host Application STATE message, if at any point the Host Application is delivered a STATE message on its own Host Application ID with a 'online' value of false, it MUST immediately republish its STATE message to the same MQTT Server with a 'online' value of true and the 'timestamp' set to the same value that was used for the timestamp in its own prior MQTT CONNECT packet Will Message payload.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 145
+  },
+  {
+    "id": "tck-id-message-flow-phid-sparkplug-clean-session-311",
+    "text": "The CONNECT Control Packet for all Sparkplug Host Applications when using MQTT 3.1.1 MUST set the MQTT 'Clean Session' flag to true.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 96
+  },
+  {
+    "id": "tck-id-message-flow-phid-sparkplug-clean-session-50",
+    "text": "The CONNECT Control Packet for all Sparkplug Host Applications when using MQTT 5.0 MUST set the the MQTT 'Clean Start' flag to true and the 'Session Expiry Interval' to 0.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 100
+  },
+  {
+    "id": "tck-id-message-flow-phid-sparkplug-state-publish",
+    "text": "Once an MQTT Session has been established, the Sparkplug Host Application subscriptions on the Sparkplug Topic Namespace have been established and the STATE topic subscription has been established, the Sparkplug Host Application MUST publish a new STATE message.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 116
+  },
+  {
+    "id": "tck-id-message-flow-phid-sparkplug-state-publish-payload",
+    "text": "The Host Application Birth Certificate Payload MUST be JSON UTF-8 data. It MUST include two key/value pairs where one key MUST be 'online' and its value is a boolean 'true'. The other key MUST be 'timestamp' and the value MUST be the same value set in the immediately prior MQTT CONNECT packet's Will Message payload.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 121
+  },
+  {
+    "id": "tck-id-message-flow-phid-sparkplug-state-publish-payload-timestamp",
+    "text": "The timestamp value in the Host Application Birth Certificate payload MUST be the same value set in the immediately prior MQTT CONNECT packet's Will Message payload.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 127
+  },
+  {
+    "id": "tck-id-message-flow-phid-sparkplug-subscription",
+    "text": "The subscription on the Sparkplug Topic Namespace and the STATE topic MUST be done immediately after successfully establishing the MQTT session and before publishing its own STATE message.",
+    "category": "message",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 112
+  },
+  {
+    "id": "tck-id-operational-behavior-data-commands-dcmd-metric-name",
+    "text": "A DCMD message SHOULD include a metric name that was included in the associated DBIRTH message for the Device.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 1013
+  },
+  {
+    "id": "tck-id-operational-behavior-data-commands-dcmd-metric-value",
+    "text": "A DCMD message MUST include a compatible metric value for the metric name that it is writing to.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 1018
+  },
+  {
+    "id": "tck-id-operational-behavior-data-commands-dcmd-verb",
+    "text": "A Device level command MUST use the DCMD Sparkplug verb.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 1011
+  },
+  {
+    "id": "tck-id-operational-behavior-data-commands-ncmd-metric-name",
+    "text": "An NCMD message SHOULD include a metric name that was included in the associated NBIRTH message for the Edge Node.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 1000
+  },
+  {
+    "id": "tck-id-operational-behavior-data-commands-ncmd-metric-value",
+    "text": "An NCMD message MUST include a compatible metric value for the metric name that it is writing to.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 1005
+  },
+  {
+    "id": "tck-id-operational-behavior-data-commands-ncmd-rebirth-name",
+    "text": "A Rebirth Request MUST include a metric with a name of 'Node Control/Rebirth'.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 972
+  },
+  {
+    "id": "tck-id-operational-behavior-data-commands-ncmd-rebirth-value",
+    "text": "A Rebirth Request MUST include a metric value of true.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 974
+  },
+  {
+    "id": "tck-id-operational-behavior-data-commands-ncmd-rebirth-verb",
+    "text": "A Rebirth Request MUST use the NCMD Sparkplug verb.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 970
+  },
+  {
+    "id": "tck-id-operational-behavior-data-commands-ncmd-verb",
+    "text": "An Edge Node level command MUST use the NCMD Sparkplug verb.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 998
+  },
+  {
+    "id": "tck-id-operational-behavior-data-commands-rebirth-action-1",
+    "text": "When an Edge Node receives a Rebirth Request, it MUST immediately stop sending DATA messages.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 979
+  },
+  {
+    "id": "tck-id-operational-behavior-data-commands-rebirth-action-2",
+    "text": "After an Edge Node stops sending DATA messages, it MUST send a complete BIRTH sequence including the NBIRTH and DBIRTH(s) if applicable.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 981
+  },
+  {
+    "id": "tck-id-operational-behavior-data-commands-rebirth-action-3",
+    "text": "The NBIRTH MUST include the same bdSeq metric with the same value it had included in the Will Message of the previous MQTT CONNECT packet.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 984
+  },
+  {
+    "id": "tck-id-operational-behavior-data-commands-rebirth-datatype",
+    "text": "The 'Node Control/Rebirth' metric in the NBIRTH message MUST have a datatype of 'Boolean'.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 962
+  },
+  {
+    "id": "tck-id-operational-behavior-data-commands-rebirth-name",
+    "text": "An NBIRTH message MUST include a metric with a name of 'Node Control/Rebirth'.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 955
+  },
+  {
+    "id": "tck-id-operational-behavior-data-commands-rebirth-name-aliases",
+    "text": "When aliases are being used by an Edge Node an NBIRTH message MUST NOT include an alias for the 'Node Control/Rebirth' metric.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 957
+  },
+  {
+    "id": "tck-id-operational-behavior-data-commands-rebirth-value",
+    "text": "The 'Node Control/Rebirth' metric value in the NBIRTH message MUST have a value of false.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 964
+  },
+  {
+    "id": "tck-id-operational-behavior-data-publish-dbirth",
+    "text": "DBIRTH messages MUST include all metrics for the specified Device that will ever be published for that Device within the established Sparkplug session.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 901
+  },
+  {
+    "id": "tck-id-operational-behavior-data-publish-dbirth-change",
+    "text": "DDATA messages SHOULD only be published when Device level metrics change.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 907
+  },
+  {
+    "id": "tck-id-operational-behavior-data-publish-dbirth-order",
+    "text": "For all metrics where ishistorical=false, DBIRTH and DDATA messages MUST keep metric values in chronological order in the list of metrics in the payload.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 917
+  },
+  {
+    "id": "tck-id-operational-behavior-data-publish-dbirth-values",
+    "text": "For each metric in the DBIRTH, the value MUST be set to the current value or if the current value is null, the isnull flag MUST be set to true and MUST NOT have a value specified.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 904
+  },
+  {
+    "id": "tck-id-operational-behavior-data-publish-nbirth",
+    "text": "NBIRTH messages MUST include all metrics for the specified Edge Node that will ever be published for that Edge Node within the established Sparkplug session.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 879
+  },
+  {
+    "id": "tck-id-operational-behavior-data-publish-nbirth-change",
+    "text": "NDATA messages SHOULD only be published when Edge Node level metrics change.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 885
+  },
+  {
+    "id": "tck-id-operational-behavior-data-publish-nbirth-order",
+    "text": "For all metrics where ishistorical=false, NBIRTH and NDATA messages MUST keep metric values in chronological order in the list of metrics in the payload.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 895
+  },
+  {
+    "id": "tck-id-operational-behavior-data-publish-nbirth-values",
+    "text": "For each metric in the NBIRTH, the value MUST be set to the current value or if the current value is null, the isnull flag MUST be set to true and MUST NOT have a value specified.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 882
+  },
+  {
+    "id": "tck-id-operational-behavior-device-ddeath",
+    "text": "If a Sparkplug Edge Node loses connection with an attached Sparkplug Device, it MUST publish a DDEATH message on behalf of the device.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 480
+  },
+  {
+    "id": "tck-id-operational-behavior-edge-node-birth-sequence-wait",
+    "text": "The Edge Node MUST also wait to publish its BIRTH sequence until an online=true STATE message is received by the Edge Node.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 615
+  },
+  {
+    "id": "tck-id-operational-behavior-edge-node-intentional-disconnect-ndeath",
+    "text": "When an Edge Node disconnects intentionally, it MUST publish an NDEATH before terminating the connection.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 299
+  },
+  {
+    "id": "tck-id-operational-behavior-edge-node-intentional-disconnect-packet",
+    "text": "Immediately following the NDEATH publish, a DISCONNECT packet MAY be sent to the MQTT Server.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 302
+  },
+  {
+    "id": "tck-id-operational-behavior-edge-node-termination-host-action-ddeath-devices-offline",
+    "text": "Immediately after receiving an DDEATH from an Edge Node, Host Applications MUST mark the Sparkplug Device associated with the Edge Node as offline using the timestamp in the DDEATH payload",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 503
+  },
+  {
+    "id": "tck-id-operational-behavior-edge-node-termination-host-action-ddeath-devices-tags-stale",
+    "text": "Immediately after receiving an DDEATH from an Edge Node, Host Applications MUST mark all of the metrics that were included with the associated Sparkplug Device DBIRTH messages as STALE using the timestamp in the DDEATH payload",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 507
+  },
+  {
+    "id": "tck-id-operational-behavior-edge-node-termination-host-action-ndeath-devices-offline",
+    "text": "Immediately after receiving an NDEATH from an Edge Node, Host Applications MUST mark all Sparkplug Devices associated with the Edge Node as offline using the current Host Application's system UTC time",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 347
+  },
+  {
+    "id": "tck-id-operational-behavior-edge-node-termination-host-action-ndeath-devices-tags-stale",
+    "text": "Immediately after receiving an NDEATH from an Edge Node, Host Applications MUST mark all of the metrics that were included with associated Sparkplug Device DBIRTH messages as STALEusing the current Host Application's system UTC time",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 350
+  },
+  {
+    "id": "tck-id-operational-behavior-edge-node-termination-host-action-ndeath-node-offline",
+    "text": "Immediately after receiving an NDEATH from an Edge Node, Host Applications MUST mark the Edge Node as offline using the current Host Application's system UTC time",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 341
+  },
+  {
+    "id": "tck-id-operational-behavior-edge-node-termination-host-action-ndeath-node-tags-stale",
+    "text": "Immediately after receiving an NDEATH from an Edge Node, Host Applications MUST mark all metrics that were included in the previous NBIRTH as STALE using the current Host Application's system UTC time",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 344
+  },
+  {
+    "id": "tck-id-operational-behavior-edge-node-termination-host-offline",
+    "text": "If the Edge Node is configured to use a Primary Host Application, it MUST disconnect from the current MQTT Server if the online JSON value is false and the timestamp value is greater than or equal to the previous online STATE message timestamp value.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 364
+  },
+  {
+    "id": "tck-id-operational-behavior-edge-node-termination-host-offline-reconnect",
+    "text": "If the Edge Node disconnects after being in a Sparkplug session due to a valid 'offline STATE message', it MUST attempt to connect to the next MQTT Server in its connection list to start the session establishment procedure over again.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 368
+  },
+  {
+    "id": "tck-id-operational-behavior-edge-node-termination-host-offline-timestamp",
+    "text": "Consider an Edge Node that is configured to use a Primary Host Application and the Edge Node is connected and publishing. Then it receives an offline STATE message. It MUST NOT disconnect if the timestamp value is less than the value from the previous online STATE message.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 372
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-connect-birth",
+    "text": "The MQTT Client associated with the Sparkplug Host Application MUST send a birth message immediately after successfully connecting to the MQTT Server.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 773
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-connect-birth-payload",
+    "text": "The Birth Certificate Payload MUST be JSON UTF-8 data. It MUST include two key/value pairs where one key MUST be 'online' and it's value is a boolean 'true'. The other key MUST be 'timestamp' and the value MUST match the timestamp value that was used in the immediately prior MQTT CONNECT packet Will Message payload.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 779
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-connect-birth-qos",
+    "text": "The Host Application's Birth MQTT QoS MUST be 1 (at least once).",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 784
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-connect-birth-retained",
+    "text": "The Host Application's Birth retained flag MUST be set to true.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 786
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-connect-birth-topic",
+    "text": "The Host Application's Birth topic MUST be of the form 'spBv1.0/STATE/sparkplughostid' where hostid is the unique identifier of the Sparkplug Host Application",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 776
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-connect-will",
+    "text": "When a Sparkplug Host Application sends its MQTT CONNECT packet, it MUST include a Will Message.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 755
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-connect-will-payload",
+    "text": "The Death Certificate Payload MUST be JSON UTF-8 data. It MUST include two key/value pairs where one key MUST be 'online' and it's value is a boolean 'false'. The other key MUST be 'timestamp' and the value MUST be the same value that was used for the timestamp in its own prior MQTT CONNECT packet Will Message payload.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 760
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-connect-will-qos",
+    "text": "The MQTT Will Message's MQTT QoS MUST be 1 (at least once).",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 765
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-connect-will-retained",
+    "text": "The MQTT Will Message's retained flag MUST be set to true.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 767
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-connect-will-topic",
+    "text": "The MQTT Will Message's topic MUST be of the form 'spBv1.0/STATE/sparkplughostid' where hostid is the unique identifier of the Sparkplug Host Application",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 757
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-death-payload",
+    "text": "The Death Certificate Payload registered as the MQTT Will Message in the MQTT CONNECT packet MUST be JSON UTF-8 data. It MUST include two key/value pairs where one key MUST be 'online' and it's value is a boolean 'false'. The other key MUST be 'timestamp' and the value MUST be a numeric value representing the current UTC time in milliseconds since Epoch.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 808
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-death-qos",
+    "text": "The Sparkplug Host Application's Death MQTT QoS MUST be 1 (at least once).",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 813
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-death-retained",
+    "text": "The Sparkplug Host Application's Death retained flag MUST be set to true.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 815
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-death-topic",
+    "text": "The Sparkplug Host Application's Death topic MUST be of the form 'spBv1.0/STATE/sparkplughostid' where hostid is the unique identifier of the Sparkplug Host Application.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 805
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-disconnect-intentional",
+    "text": "In the case of intentionally disconnecting, an MQTT DISCONNECT packet MAY be sent immediately after the Death message is published.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 817
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-host-id",
+    "text": "The sparkplughostid MUST be unique to all other Sparkplug Host IDs in the infrastructure.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 753
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-multi-server-timestamp",
+    "text": "The Host Application MUST maintain a STATE Message timestamp value on a per MQTT Server basis.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 792
+  },
+  {
+    "id": "tck-id-operational-behavior-host-application-termination",
+    "text": "If the Sparkplug Host Application ever disconnects intentionally, it MUST publish a Death message with the following characteristics.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 801
+  },
+  {
+    "id": "tck-id-operational-behavior-host-reordering-param",
+    "text": "Sparkplug Host Applications SHOULD provide a configurable 'Reorder Timeout' parameter",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 559
+  },
+  {
+    "id": "tck-id-operational-behavior-host-reordering-rebirth",
+    "text": "If a Sparkplug Host Application is configured with a 'reordering timeout' parameter and the Reorder Timeout elapses and the missing message(s) have not been received, the Sparkplug Host Application MUST send an NCMD to the Edge Node with a 'Node Control/Rebirth' request",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 565
+  },
+  {
+    "id": "tck-id-operational-behavior-host-reordering-start",
+    "text": "If a Sparkplug Host Application is configured with a 'reordering timeout' parameter and a message arrives with an out of order sequence number, the Host Application MUST start a timer denoting the start of the Reorder Timeout window",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 561
+  },
+  {
+    "id": "tck-id-operational-behavior-host-reordering-success",
+    "text": "If the missing message(s) that triggered the start of the Reorder Timeout timer arrive before the reordering timer elapses, the timer MUST be terminated and normal operation in the Host Application MUST continue until another out of order message arrives.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 571
+  },
+  {
+    "id": "tck-id-operational-behavior-primary-application-state-with-multiple-servers-single-server",
+    "text": "The Edge Nodes MUST not connected to more than one server at any point in time.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 600
+  },
+  {
+    "id": "tck-id-operational-behavior-primary-application-state-with-multiple-servers-state",
+    "text": "Regardless of the number of MQTT Servers in a Sparkplug Infrastructure, every time a Primary Host Application establishes a new MQTT Session with an MQTT Server, the STATE Birth Certificate defined in the link:#payloadsdescstate[STATE description section] MUST be the first message that is published after a successful MQTT Session is established with each MQTT Server.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 591
+  },
+  {
+    "id": "tck-id-operational-behavior-primary-application-state-with-multiple-servers-state-subs",
+    "text": "When using multiple MQTT Servers and Edge Nodes are configured with a Primary Host Application, the Primary Host Application instance MUST be configured to publish a STATE Birth Certificate and all Edge Nodes configured with a Primary Host Application MUST subscribe to this STATE message.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 586
+  },
+  {
+    "id": "tck-id-operational-behavior-primary-application-state-with-multiple-servers-walk",
+    "text": "If the Primary Host Application is offline as denoted via the STATE MQTT Message, the Edge Node MUST terminate its session with this MQTT Server and move to the next available MQTT Server that is available.",
+    "category": "operational",
+    "source_file": "Sparkplug_5_Operational_Behavior.adoc",
+    "source_line": 610
+  },
+  {
+    "id": "tck-id-payloads-alias-birth-requirement",
+    "text": "NBIRTH and DBIRTH messages MUST include both a metric name and alias.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 468
+  },
+  {
+    "id": "tck-id-payloads-alias-data-cmd-requirement",
+    "text": "NDATA, DDATA, NCMD, and DCMD messages MUST only include an alias and the metric name MUST be excluded.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 470
+  },
+  {
+    "id": "tck-id-payloads-alias-uniqueness",
+    "text": "If supplied in an NBIRTH or DBIRTH it MUST be a unique number across this Edge Node's entire set of metrics.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 462
+  },
+  {
+    "id": "tck-id-payloads-dataset-column-num-headers",
+    "text": "The size of the array MUST have the same number of elements that the types array contains.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 658
+  },
+  {
+    "id": "tck-id-payloads-dataset-column-size",
+    "text": "This MUST be an unsigned 64-bit integer representing the number of columns in this DataSet.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 654
+  },
+  {
+    "id": "tck-id-payloads-dataset-parameter-type-req",
+    "text": "The types array MUST be included in all DataSets.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 670
+  },
+  {
+    "id": "tck-id-payloads-dataset-types-def",
+    "text": "This MUST be an array of unsigned 32 bit integers representing the datatypes of the columns.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 661
+  },
+  {
+    "id": "tck-id-payloads-dataset-types-num",
+    "text": "The array of types MUST have the same number of elements that the columns array contains.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 663
+  },
+  {
+    "id": "tck-id-payloads-dataset-types-type",
+    "text": "The values in the types array MUST be a unsigned 32-bit integer representing the datatype.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 665
+  },
+  {
+    "id": "tck-id-payloads-dataset-types-value",
+    "text": "This values in the types array MUST be one of the enumerated values as shown in the link:#payloadsbdatatypebasic[Sparkplug Basic Data Types].",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 667
+  },
+  {
+    "id": "tck-id-payloads-dbirth-order",
+    "text": "All DBIRTH messages sent by an Edge Node MUST be sent immediately after the NBIRTH and before any NDATA or DDATA messages are published by the Edge Node.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1185
+  },
+  {
+    "id": "tck-id-payloads-dbirth-qos",
+    "text": "DBIRTH messages MUST be published with the MQTT QoS set to 0.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1188
+  },
+  {
+    "id": "tck-id-payloads-dbirth-retain",
+    "text": "DBIRTH messages MUST be published with the MQTT retain flag set to false.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1190
+  },
+  {
+    "id": "tck-id-payloads-dbirth-seq",
+    "text": "Every DBIRTH message MUST include a sequence number.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1179
+  },
+  {
+    "id": "tck-id-payloads-dbirth-seq-inc",
+    "text": "Every DBIRTH message MUST include a sequence number value that is one greater than the previous sequence number sent by the Edge Node. This value MUST never exceed 255. If in the previous sequence number sent by the Edge Node was 255, the next sequence number sent MUST have a value of 0.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1181
+  },
+  {
+    "id": "tck-id-payloads-dbirth-timestamp",
+    "text": "DBIRTH messages MUST include a payload timestamp that denotes the time at which the message was published.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1176
+  },
+  {
+    "id": "tck-id-payloads-dcmd-qos",
+    "text": "DCMD messages MUST be published with the MQTT QoS set to 0.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1463
+  },
+  {
+    "id": "tck-id-payloads-dcmd-retain",
+    "text": "DCMD messages MUST be published with the MQTT retain flag set to false.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1465
+  },
+  {
+    "id": "tck-id-payloads-dcmd-seq",
+    "text": "Every DCMD message MUST NOT include a sequence number.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1461
+  },
+  {
+    "id": "tck-id-payloads-dcmd-timestamp",
+    "text": "DCMD messages MUST include a payload timestamp that denotes the time at which the message was published.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1458
+  },
+  {
+    "id": "tck-id-payloads-ddata-order",
+    "text": "All DDATA messages sent by an Edge Node MUST NOT be sent until all the NBIRTH and all DBIRTH messages have been published by the Edge Node.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1368
+  },
+  {
+    "id": "tck-id-payloads-ddata-qos",
+    "text": "DDATA messages MUST be published with the MQTT QoS set to 0.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1371
+  },
+  {
+    "id": "tck-id-payloads-ddata-retain",
+    "text": "DDATA messages MUST be published with the MQTT retain flag set to false.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1373
+  },
+  {
+    "id": "tck-id-payloads-ddata-seq",
+    "text": "Every DDATA message MUST include a sequence number.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1362
+  },
+  {
+    "id": "tck-id-payloads-ddata-seq-inc",
+    "text": "Every DDATA message MUST include a sequence number value that is one greater than the previous sequence number sent by the Edge Node. This value MUST never exceed 255. If in the previous sequence number sent by the Edge Node was 255, the next sequence number sent MUST have a value of 0.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1364
+  },
+  {
+    "id": "tck-id-payloads-ddata-timestamp",
+    "text": "DDATA messages MUST include a payload timestamp that denotes the time at which the message was published.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1359
+  },
+  {
+    "id": "tck-id-payloads-ddeath-seq",
+    "text": "Every DDEATH message MUST include a sequence number.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1585
+  },
+  {
+    "id": "tck-id-payloads-ddeath-seq-inc",
+    "text": "Every DDEATH message MUST include a sequence number value that is one greater than the previous sequence number sent by the Edge Node. This value MUST never exceed 255. If in the previous sequence number sent by the Edge Node was 255, the next sequence number sent MUST have a value of 0.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1587
+  },
+  {
+    "id": "tck-id-payloads-ddeath-seq-number",
+    "text": "A sequence number MUST be included with the DDEATH messages so the Host Application can ensure order of messages and maintain the state of the data.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1612
+  },
+  {
+    "id": "tck-id-payloads-ddeath-timestamp",
+    "text": "DDEATH messages MUST include a payload timestamp that denotes the time at which the message was published.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1582
+  },
+  {
+    "id": "tck-id-payloads-metric-datatype-not-req",
+    "text": "The datatype SHOULD NOT be included with metric definitions in NDATA, NCMD, DDATA, and DCMD messages.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 491
+  },
+  {
+    "id": "tck-id-payloads-metric-datatype-req",
+    "text": "The datatype MUST be included with each metric definition in NBIRTH and DBIRTH messages.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 489
+  },
+  {
+    "id": "tck-id-payloads-metric-datatype-value",
+    "text": "The datatype MUST be one of the enumerated values as shown in the link:#payloadsbdatatypes[valid Sparkplug Data Types].",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 486
+  },
+  {
+    "id": "tck-id-payloads-metric-datatype-value-type",
+    "text": "The datatype MUST be an unsigned 32-bit integer representing the datatype.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 484
+  },
+  {
+    "id": "tck-id-payloads-metric-propertyvalue-type-req",
+    "text": "This MUST be included in Property Value Definitions in NBIRTH and DBIRTH messages.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 593
+  },
+  {
+    "id": "tck-id-payloads-metric-propertyvalue-type-type",
+    "text": "This MUST be an unsigned 32-bit integer representing the datatype.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 586
+  },
+  {
+    "id": "tck-id-payloads-metric-propertyvalue-type-value",
+    "text": "This value MUST be one of the enumerated values as shown in the link:#payloadsbdatatypebasic[Sparkplug Basic Data Types] or the link:#payloadsbdatatypepropertyvalue[Sparkplug Property Value Data Types].",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 588
+  },
+  {
+    "id": "tck-id-payloads-metric-timestamp-in-UTC",
+    "text": "The timestamp MUST be in UTC.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 479
+  },
+  {
+    "id": "tck-id-payloads-name-birth-data-requirement",
+    "text": "The timestamp MUST be included with every metric in all NBIRTH, DBIRTH, NDATA, and DDATA messages.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 475
+  },
+  {
+    "id": "tck-id-payloads-name-cmd-requirement",
+    "text": "The timestamp MAY be included with metrics in NCMD and DCMD messages.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 477
+  },
+  {
+    "id": "tck-id-payloads-name-requirement",
+    "text": "The name MUST be included with every metric unless aliases are being used.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 453
+  },
+  {
+    "id": "tck-id-payloads-nbirth-bdseq",
+    "text": "Every NBIRTH message MUST include a bdSeq number metric.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1073
+  },
+  {
+    "id": "tck-id-payloads-nbirth-bdseq-repeat",
+    "text": "The bdSeq number value MUST match the bdSeq number value that was sent in the prior MQTT CONNECT packet WILL Message.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1075
+  },
+  {
+    "id": "tck-id-payloads-nbirth-edge-node-descriptor",
+    "text": "Every Edge Node Descriptor in any Sparkplug infrastructure MUST be unique in the system.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1067
+  },
+  {
+    "id": "tck-id-payloads-nbirth-qos",
+    "text": "NBIRTH messages MUST be published with the MQTT QoS set to 0.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1087
+  },
+  {
+    "id": "tck-id-payloads-nbirth-rebirth-req",
+    "text": "Every NBIRTH MUST include a metric with the name 'Node Control/Rebirth' and have a boolean value of false.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1082
+  },
+  {
+    "id": "tck-id-payloads-nbirth-retain",
+    "text": "NBIRTH messages MUST be published with the MQTT retain flag set to false.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1089
+  },
+  {
+    "id": "tck-id-payloads-nbirth-seq",
+    "text": "Every NBIRTH message MUST include a sequence number and it MUST have a value between 0 and 255 (inclusive).",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1070
+  },
+  {
+    "id": "tck-id-payloads-nbirth-timestamp",
+    "text": "NBIRTH messages MUST include a payload timestamp that denotes the time at which the message was published.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1064
+  },
+  {
+    "id": "tck-id-payloads-ncmd-qos",
+    "text": "NCMD messages MUST be published with the MQTT QoS set to 0.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1419
+  },
+  {
+    "id": "tck-id-payloads-ncmd-retain",
+    "text": "NCMD messages MUST be published with the MQTT retain flag set to false.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1421
+  },
+  {
+    "id": "tck-id-payloads-ncmd-seq",
+    "text": "Every NCMD message MUST NOT include a sequence number.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1417
+  },
+  {
+    "id": "tck-id-payloads-ncmd-timestamp",
+    "text": "NCMD messages MUST include a payload timestamp that denotes the time at which the message was published.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1414
+  },
+  {
+    "id": "tck-id-payloads-ndata-order",
+    "text": "All NDATA messages sent by an Edge Node MUST NOT be sent until all the NBIRTH and all DBIRTH messages have been published by the Edge Node.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1311
+  },
+  {
+    "id": "tck-id-payloads-ndata-qos",
+    "text": "NDATA messages MUST be published with the MQTT QoS set to 0.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1314
+  },
+  {
+    "id": "tck-id-payloads-ndata-retain",
+    "text": "NDATA messages MUST be published with the MQTT retain flag set to false.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1316
+  },
+  {
+    "id": "tck-id-payloads-ndata-seq",
+    "text": "Every NDATA message MUST include a sequence number.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1305
+  },
+  {
+    "id": "tck-id-payloads-ndata-seq-inc",
+    "text": "Every NDATA message MUST include a sequence number value that is one greater than the previous sequence number sent by the Edge Node. This value MUST never exceed 255. If in the previous sequence number sent by the Edge Node was 255, the next sequence number sent MUST have a value of 0.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1307
+  },
+  {
+    "id": "tck-id-payloads-ndata-timestamp",
+    "text": "NDATA messages MUST include a payload timestamp that denotes the time at which the message was published.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1302
+  },
+  {
+    "id": "tck-id-payloads-ndeath-bdseq",
+    "text": "The NDEATH message MUST include the same bdSeq number value that will be used in the associated NBIRTH message.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1517
+  },
+  {
+    "id": "tck-id-payloads-ndeath-seq",
+    "text": "Every NDEATH message MUST NOT include a sequence number.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1509
+  },
+  {
+    "id": "tck-id-payloads-ndeath-will-message",
+    "text": "An NDEATH message MUST be registered as a Will Message in the MQTT CONNECT packet.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1511
+  },
+  {
+    "id": "tck-id-payloads-ndeath-will-message-publisher",
+    "text": "An NDEATH message SHOULD be published by the Edge Node before it intentionally disconnects from the MQTT Server.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1526
+  },
+  {
+    "id": "tck-id-payloads-ndeath-will-message-publisher-disconnect-mqtt311",
+    "text": "If the Edge Node is using MQTT 3.1.1 and it sends an MQTT DISCONNECT packet, the Edge Node MUST publish an NDEATH message to the MQTT Server before it sends the MQTT DISCONNECT packet.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1531
+  },
+  {
+    "id": "tck-id-payloads-ndeath-will-message-publisher-disconnect-mqtt50",
+    "text": "If the Edge Node is using MQTT 5.0 and it sends an MQTT DISCONNECT packet, the MQTT v5.0 'Disconnect with Will Message' reason code MUST be set in the DISCONNECT packet.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1537
+  },
+  {
+    "id": "tck-id-payloads-ndeath-will-message-qos",
+    "text": "The NDEATH message MUST set the MQTT Will QoS to 1 in the MQTT CONNECT packet.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1513
+  },
+  {
+    "id": "tck-id-payloads-ndeath-will-message-retain",
+    "text": "The NDEATH message MUST set the MQTT Will Retained flag to false in the MQTT CONNECT packet.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1515
+  },
+  {
+    "id": "tck-id-payloads-propertyset-keys-array-size",
+    "text": "The array of keys in a PropertySet MUST contain the same number of values included in the array of PropertyValue objects.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 570
+  },
+  {
+    "id": "tck-id-payloads-propertyset-quality-value-type",
+    "text": "The 'type' of the Property Value MUST be a value of 3 which represents a Signed 32-bit Integer.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 631
+  },
+  {
+    "id": "tck-id-payloads-propertyset-quality-value-value",
+    "text": "The 'value' of the Property Value MUST be an intvalue and be one of the valid quality codes of 0, 192, or 500.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 634
+  },
+  {
+    "id": "tck-id-payloads-propertyset-values-array-size",
+    "text": "The array of values in a PropertySet MUST contain the same number of items that are in the keys array.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 576
+  },
+  {
+    "id": "tck-id-payloads-sequence-num-always-included",
+    "text": "A sequence number MUST be included in the payload of every Sparkplug MQTT message from an Edge Node except NDEATH messages.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 423
+  },
+  {
+    "id": "tck-id-payloads-sequence-num-incrementing",
+    "text": "All subsequent messages after an NBIRTH from an Edge Node MUST contain a sequence number that is continually increasing by one in each message from that Edge Node until a value of 255 is reached. At that point, the sequence number of the following message MUST be zero.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 429
+  },
+  {
+    "id": "tck-id-payloads-sequence-num-req-nbirth",
+    "text": "A NBIRTH message from an Edge Node MUST always contain a sequence number between 0 and 255 (inclusive).",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 426
+  },
+  {
+    "id": "tck-id-payloads-state-birth",
+    "text": "After subscribing on it's own spBv1.0/STATE/[sparkplughostid] topic, the Sparkplug Host Application MUST publish an MQTT message on the topic 'spBv1.0/STATE/[sparkplughostid]' with a QoS of 1, and the retain flag set to true.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1644
+  },
+  {
+    "id": "tck-id-payloads-state-birth-payload",
+    "text": "The Birth Certificate Payload MUST be JSON UTF-8 data. It MUST include two key/value pairs where one key MUST be 'online' and it's value is a boolean 'true'. The other key MUST be 'timestamp' and the value MUST match the timestamp value that was used in the immediately prior MQTT CONNECT packet Will Message payload.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1650
+  },
+  {
+    "id": "tck-id-payloads-state-subscribe",
+    "text": "After establishing an MQTT connection, the Sparkplug Host Application MUST subscribe on it's own 'spBv1.0/STATE/[sparkplughostid]' topic.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1636
+  },
+  {
+    "id": "tck-id-payloads-state-will-message",
+    "text": "Sparkplug Host Applications MUST register a Will Message in the MQTT CONNECT packet on the topic 'spBv1.0/STATE/[sparkplughostid]'.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1623
+  },
+  {
+    "id": "tck-id-payloads-state-will-message-payload",
+    "text": "The Death Certificate Payload MUST be JSON UTF-8 data. It MUST include two key/value pairs where one key MUST be 'online' and it's value is a boolean 'false'. The other key MUST be 'timestamp' and the value MUST be a numeric value representing the current UTC time in milliseconds since Epoch.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1632
+  },
+  {
+    "id": "tck-id-payloads-state-will-message-qos",
+    "text": "The Sparkplug Host Application MUST set the the MQTT Will QoS to 1 in the MQTT CONNECT packet.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1628
+  },
+  {
+    "id": "tck-id-payloads-state-will-message-retain",
+    "text": "The Sparkplug Host Application MUST set the Will Retained flag to true in the MQTT CONNECT packet.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 1630
+  },
+  {
+    "id": "tck-id-payloads-template-dataset-value",
+    "text": "The value supplied MUST be one of the following Google Protobuf types: uint32, uint64, float, double, bool, or string.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 691
+  },
+  {
+    "id": "tck-id-payloads-template-definition-is-definition",
+    "text": "A Template Definition MUST have isdefinition set to true.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 709
+  },
+  {
+    "id": "tck-id-payloads-template-definition-members",
+    "text": "A Template Definition MUST include all member metrics that will ever be included in corresponding template instances.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 713
+  },
+  {
+    "id": "tck-id-payloads-template-definition-nbirth",
+    "text": "A Template Definition MUST be included in the NBIRTH for all Template Instances that are included in the NBIRTH and DBIRTH messages.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 716
+  },
+  {
+    "id": "tck-id-payloads-template-definition-nbirth-only",
+    "text": "Template Definitions MUST only be included in NBIRTH messages.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 707
+  },
+  {
+    "id": "tck-id-payloads-template-definition-parameters",
+    "text": "A Template Definition MUST include all parameters that will be included in the corresponding Template Instances.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 721
+  },
+  {
+    "id": "tck-id-payloads-template-definition-parameters-default",
+    "text": "A Template Definition MAY include values for parameters in the Template Definition parameters.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 724
+  },
+  {
+    "id": "tck-id-payloads-template-definition-ref",
+    "text": "A Template Definition MUST omit the templateref field.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 711
+  },
+  {
+    "id": "tck-id-payloads-template-instance-is-definition",
+    "text": "A Template Instance MUST have isdefinition set to false.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 731
+  },
+  {
+    "id": "tck-id-payloads-template-instance-members",
+    "text": "A Template Instance MUST include only members that were included in the corresponding template definition.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 736
+  },
+  {
+    "id": "tck-id-payloads-template-instance-members-birth",
+    "text": "A Template Instance in a NBIRTH or DBIRTH message MUST include all members that were included in the corresponding Template Definition.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 739
+  },
+  {
+    "id": "tck-id-payloads-template-instance-members-data",
+    "text": "A Template Instance in a NDATA or DDATA message MAY include only a subset of the members that were included in the corresponding template definition.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 742
+  },
+  {
+    "id": "tck-id-payloads-template-instance-parameters",
+    "text": "A Template Instance MAY include parameter values for any parameters that were included in the corresponding Template Definition.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 747
+  },
+  {
+    "id": "tck-id-payloads-template-instance-ref",
+    "text": "A Template Instance MUST have templateref set to the type of template definition it is.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 733
+  },
+  {
+    "id": "tck-id-payloads-template-is-definition",
+    "text": "This MUST be included in every Template Definition and Template Instance.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 773
+  },
+  {
+    "id": "tck-id-payloads-template-is-definition-definition",
+    "text": "This MUST be set to true if this is a Template Definition.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 775
+  },
+  {
+    "id": "tck-id-payloads-template-is-definition-instance",
+    "text": "This MUST be set to false if this is a Template Instance.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 777
+  },
+  {
+    "id": "tck-id-payloads-template-parameter-name-required",
+    "text": "This MUST be included in every Template Parameter definition.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 788
+  },
+  {
+    "id": "tck-id-payloads-template-parameter-name-type",
+    "text": "This MUST be a UTF-8 string representing the name of the Template parameter.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 790
+  },
+  {
+    "id": "tck-id-payloads-template-parameter-type-req",
+    "text": "This MUST be included in Template Parameter Definitions in NBIRTH and DBIRTH messages.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 798
+  },
+  {
+    "id": "tck-id-payloads-template-parameter-type-value",
+    "text": "This value MUST be one of the enumerated values as shown in the link:#payloadsbdatatypebasic[Sparkplug Basic Data Types].",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 795
+  },
+  {
+    "id": "tck-id-payloads-template-parameter-value",
+    "text": "The value supplied MUST be one of the following Google Protocol Buffer types: uint32, uint64, float, double, bool, or string.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 802
+  },
+  {
+    "id": "tck-id-payloads-template-parameter-value-type",
+    "text": "This MUST be an unsigned 32-bit integer representing the datatype.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 793
+  },
+  {
+    "id": "tck-id-payloads-template-ref-definition",
+    "text": "This MUST be omitted if this is a Template Definition.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 766
+  },
+  {
+    "id": "tck-id-payloads-template-ref-instance",
+    "text": "This MUST be a UTF-8 string representing a reference to a Template Definition name if this is a Template Instance.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 768
+  },
+  {
+    "id": "tck-id-payloads-template-version",
+    "text": "If included, the version MUST be a UTF-8 string representing the version of the Template.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 757
+  },
+  {
+    "id": "tck-id-payloads-timestamp-in-UTC",
+    "text": "This timestamp MUST be in UTC.",
+    "category": "payloads",
+    "source_file": "Sparkplug_6_Payloads.adoc",
+    "source_line": 415
+  },
+  {
+    "id": "tck-id-topic-structure",
+    "text": "All MQTT clients using the Sparkplug specification MUST use the following topic namespace structure:",
+    "category": "topic",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 34
+  },
+  {
+    "id": "tck-id-topic-structure-namespace-a",
+    "text": "For the Sparkplug B version of the payload definition, the UTF-8 string constant for the namespace element MUST be:",
+    "category": "topic",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 47
+  },
+  {
+    "id": "tck-id-topic-structure-namespace-device-id-associated-message-types",
+    "text": "The deviceid MUST be included with messagetype elements DBIRTH, DDEATH, DDATA, and DCMD based topics.",
+    "category": "topic",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 131
+  },
+  {
+    "id": "tck-id-topic-structure-namespace-device-id-non-associated-message-types",
+    "text": "The deviceid MUST NOT be included with messagetype elements NBIRTH, NDEATH, NDATA, NCMD, and STATE based topics",
+    "category": "topic",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 134
+  },
+  {
+    "id": "tck-id-topic-structure-namespace-duplicate-device-id-across-edge-node",
+    "text": "The deviceid MAY be duplicated from Edge Node to other Edge Nodes.",
+    "category": "topic",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 127
+  },
+  {
+    "id": "tck-id-topic-structure-namespace-unique-device-id",
+    "text": "The deviceid MUST be unique from other devices being reported on by the same Edge Node.",
+    "category": "topic",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 124
+  },
+  {
+    "id": "tck-id-topic-structure-namespace-unique-edge-node-descriptor",
+    "text": "The groupid combined with the edgenodeid element MUST be unique from any other groupid/edgenodeid assigned in the MQTT infrastructure.",
+    "category": "topic",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 101
+  },
+  {
+    "id": "tck-id-topic-structure-namespace-valid-device-id",
+    "text": "The format of the deviceid MUST be a valid UTF-8 string except for the reserved characters of + (plus), / (forward slash), and # (number sign).",
+    "category": "topic",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 120
+  },
+  {
+    "id": "tck-id-topic-structure-namespace-valid-edge-node-id",
+    "text": "The format of the edgenodeid MUST be a valid UTF-8 string with the exception of the reserved characters of + (plus), / (forward slash), and # (number sign).",
+    "category": "topic",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 105
+  },
+  {
+    "id": "tck-id-topic-structure-namespace-valid-group-id",
+    "text": "The format of the Group ID MUST be a valid UTF-8 string with the exception of the reserved characters of + (plus), / (forward slash), and # (number sign).",
+    "category": "topic",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 64
+  },
+  {
+    "id": "tck-id-topics-dbirth-metric-reqs",
+    "text": "The DBIRTH MUST include every metric the Edge Node will ever report on.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 392
+  },
+  {
+    "id": "tck-id-topics-dbirth-metrics",
+    "text": "At a minimum each metric MUST include the metric name, metric datatype, and current value.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 394
+  },
+  {
+    "id": "tck-id-topics-dbirth-mqtt",
+    "text": "DBIRTH messages MUST be published with MQTT QoS equal to 0 and retain equal to false.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 384
+  },
+  {
+    "id": "tck-id-topics-dbirth-seq",
+    "text": "The DBIRTH MUST include a sequence number in the payload and it MUST have a value of one greater than the previous MQTT message from the Edge Node contained unless the previous MQTT message contained a value of 255. In this case the sequence number MUST be 0.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 386
+  },
+  {
+    "id": "tck-id-topics-dbirth-timestamp",
+    "text": "The DBIRTH MUST include a timestamp denoting the date and time the message was sent from the Edge Node.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 390
+  },
+  {
+    "id": "tck-id-topics-dbirth-topic",
+    "text": "The Device Birth topic for a Sparkplug Device MUST be of the form 'namespace/groupid/DBIRTH/edgenodeid/deviceid' where the namespace is replaced with the specific namespace for this version of Sparkplug and the groupid, edgenodeid, and deviceid are replaced with the Group, Edge Node, and Device ID for this specific Device.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 373
+  },
+  {
+    "id": "tck-id-topics-dcmd-mqtt",
+    "text": "DCMD messages MUST be published with MQTT QoS equal to 0 and retain equal to false.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 508
+  },
+  {
+    "id": "tck-id-topics-dcmd-payload",
+    "text": "The DCMD MUST include the metrics that need to be written to on the Device.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 513
+  },
+  {
+    "id": "tck-id-topics-dcmd-timestamp",
+    "text": "The DCMD MUST include a timestamp denoting the date and time the message was sent from the Host Application’s MQTT client.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 510
+  },
+  {
+    "id": "tck-id-topics-dcmd-topic",
+    "text": "The Device command topic for a Sparkplug Device MUST be of the form 'namespace/groupid/DCMD/edgenodeid/deviceid' where the namespace is replaced with the specific namespace for this version of Sparkplug and the groupid, edgenodeid, and deviceid are replaced with the Group, Edge Node, and Device ID for this specific Device.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 497
+  },
+  {
+    "id": "tck-id-topics-ddata-mqtt",
+    "text": "DDATA messages MUST be published with MQTT QoS equal to 0 and retain equal to false.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 444
+  },
+  {
+    "id": "tck-id-topics-ddata-payload",
+    "text": "The DDATA MUST include the Device’s metrics that have changed since the last DBIRTH or DDATA message.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 452
+  },
+  {
+    "id": "tck-id-topics-ddata-seq-num",
+    "text": "The DDATA MUST include a sequence number in the payload and it MUST have a value of one greater than the previous MQTT message from the Edge Node contained unless the previous MQTT message contained a value of 255. In this case the sequence number MUST be 0.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 446
+  },
+  {
+    "id": "tck-id-topics-ddata-timestamp",
+    "text": "The DDATA MUST include a timestamp denoting the date and time the message was sent from the Edge Node.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 450
+  },
+  {
+    "id": "tck-id-topics-ddata-topic",
+    "text": "The Device command topic for a Sparkplug Device MUST be of the form 'namespace/groupid/DDATA/edgenodeid/deviceid' where the namespace is replaced with the specific namespace for this version of Sparkplug and the groupid, edgenodeid, and deviceid are replaced with the Group, Edge Node, and Device ID for this specific Device.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 431
+  },
+  {
+    "id": "tck-id-topics-ddeath-mqtt",
+    "text": "DDEATH messages MUST be published with MQTT QoS equal to 0 and retain equal to false.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 481
+  },
+  {
+    "id": "tck-id-topics-ddeath-seq-num",
+    "text": "The DDEATH MUST include a sequence number in the payload and it MUST have a value of one greater than the previous MQTT message from the Edge Node contained unless the previous MQTT message contained a value of 255. In this case the sequence number MUST be 0.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 483
+  },
+  {
+    "id": "tck-id-topics-ddeath-topic",
+    "text": "The Device Death Certificate topic for a Sparkplug Device MUST be of the form 'namespace/groupid/DDEATH/edgenodeid/deviceid' where the namespace is replaced with the specific namespace for this version of Sparkplug and the groupid, edgenodeid, and deviceid are replaced with the Group, Edge Node, and Device ID for this specific Device.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 470
+  },
+  {
+    "id": "tck-id-topics-nbirth-bdseq-included",
+    "text": "A bdSeq number as a metric MUST be included in the payload.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 208
+  },
+  {
+    "id": "tck-id-topics-nbirth-bdseq-increment",
+    "text": "The bdSeq number MUST start at zero and increment by one on every new MQTT CONNECT packet.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 213
+  },
+  {
+    "id": "tck-id-topics-nbirth-bdseq-matching",
+    "text": "This MUST match the bdSeq number provided in the MQTT CONNECT packet’s Will Message payload.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 210
+  },
+  {
+    "id": "tck-id-topics-nbirth-metric-reqs",
+    "text": "The NBIRTH MUST include every metric the Edge Node will ever report on.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 201
+  },
+  {
+    "id": "tck-id-topics-nbirth-metrics",
+    "text": "At a minimum each metric MUST include the metric name, datatype, and current value.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 203
+  },
+  {
+    "id": "tck-id-topics-nbirth-mqtt",
+    "text": "NBIRTH messages MUST be published with MQTT QoS equal to 0 and retain equal to false.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 195
+  },
+  {
+    "id": "tck-id-topics-nbirth-rebirth-metric",
+    "text": "The NBIRTH message MUST include a metric with the name 'Node Control/Rebirth'. It MUST be of datatype boolean and have a value of false.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 215
+  },
+  {
+    "id": "tck-id-topics-nbirth-seq-num",
+    "text": "The NBIRTH MUST include a sequence number in the payload and it MUST have a value of 0.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 197
+  },
+  {
+    "id": "tck-id-topics-nbirth-templates",
+    "text": "If Template instances will be published by this Edge Node or any devices, all Template definitions MUST be published in the NBIRTH.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 205
+  },
+  {
+    "id": "tck-id-topics-nbirth-timestamp",
+    "text": "The NBIRTH MUST include a timestamp denoting the date and time the message was sent from the Edge Node.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 199
+  },
+  {
+    "id": "tck-id-topics-nbirth-topic",
+    "text": "The Birth Certificate topic for a Sparkplug Edge Node MUST be of the form 'namespace/groupid/NBIRTH/edgenodeid' where the namespace is replaced with the specific namespace for this version of Sparkplug and the groupid and edgenodeid are replaced with the Group and Edge Node ID for this specific Edge Node.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 176
+  },
+  {
+    "id": "tck-id-topics-ncmd-mqtt",
+    "text": "NCMD messages MUST be published with MQTT QoS equal to 0 and retain equal to false.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 344
+  },
+  {
+    "id": "tck-id-topics-ncmd-payload",
+    "text": "The NCMD MUST include the metrics that need to be written to on the Edge Node.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 349
+  },
+  {
+    "id": "tck-id-topics-ncmd-timestamp",
+    "text": "The NCMD MUST include a timestamp denoting the date and time the message was sent from the Host Application’s MQTT client.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 346
+  },
+  {
+    "id": "tck-id-topics-ncmd-topic",
+    "text": "The Edge Node command topic for a Sparkplug Edge Node MUST be of the form 'namespace/groupid/NCMD/edgenodeid' where the namespace is replaced with the specific namespace for this version of Sparkplug and the groupid and edgenodeid are replaced with the Group and Edge Node ID for this specific Edge Node.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 333
+  },
+  {
+    "id": "tck-id-topics-ndata-mqtt",
+    "text": "NDATA messages MUST be published with MQTT QoS equal to 0 and retain equal to false.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 273
+  },
+  {
+    "id": "tck-id-topics-ndata-payload",
+    "text": "The NDATA MUST include the Edge Node’s metrics that have changed since the last NBIRTH or NDATA message.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 281
+  },
+  {
+    "id": "tck-id-topics-ndata-seq-num",
+    "text": "The NDATA MUST include a sequence number in the payload and it MUST have a value of one greater than the previous MQTT message from the Edge Node contained unless the previous MQTT message contained a value of 255. In this case the sequence number MUST be 0.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 275
+  },
+  {
+    "id": "tck-id-topics-ndata-timestamp",
+    "text": "The NDATA MUST include a timestamp denoting the date and time the message was sent from the Edge Node.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 279
+  },
+  {
+    "id": "tck-id-topics-ndata-topic",
+    "text": "The Edge Node data topic for a Sparkplug Edge Node MUST be of the form 'namespace/groupid/NDATA/edgenodeid' where the namespace is replaced with the specific namespace for this version of Sparkplug and the groupid and edgenodeid are replaced with the Group and Edge Node ID for this specific Edge Node.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 259
+  },
+  {
+    "id": "tck-id-topics-ndeath-payload",
+    "text": "The NDEATH message contains a very simple payload that MUST only include a single metric, the bdSeq number, so that the NDEATH event can be associated with the NBIRTH.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 309
+  },
+  {
+    "id": "tck-id-topics-ndeath-seq",
+    "text": "The NDEATH message MUST NOT include a sequence number.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 314
+  },
+  {
+    "id": "tck-id-topics-ndeath-topic",
+    "text": "The Edge Node Death Certificate topic for a Sparkplug Edge Node MUST be of the form 'namespace/groupid/NDEATH/edgenodeid' where the namespace is replaced with the specific namespace for this version of Sparkplug and the groupid and edgenodeid are replaced with the Group and Edge Node ID for this specific Edge Node.",
+    "category": "topics",
+    "source_file": "Sparkplug_4_Topics.adoc",
+    "source_line": 300
+  }
+]
