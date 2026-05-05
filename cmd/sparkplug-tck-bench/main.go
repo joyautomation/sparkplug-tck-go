@@ -30,14 +30,27 @@ type catalogEntry struct {
 }
 
 type report struct {
-	CatalogTotal int                  `json:"catalog_total"`
-	PassiveIDs   int                  `json:"passive_ids"`
-	HarnessIDs   int                  `json:"harness_ids"`
-	UnionIDs     int                  `json:"union_ids"`
-	UncoveredIDs []string             `json:"uncovered_ids"`
-	HarnessOnly  []string             `json:"harness_only_ids"`
-	ProfileTimes map[string]int       `json:"profile_times_ms"`
-	Upstream     []upstreamTestParity `json:"upstream_tests,omitempty"`
+	CatalogTotal int                       `json:"catalog_total"`
+	PassiveIDs   int                       `json:"passive_ids"`
+	HarnessIDs   int                       `json:"harness_ids"`
+	UnionIDs     int                       `json:"union_ids"`
+	UncoveredIDs []string                  `json:"uncovered_ids"`
+	HarnessOnly  []string                  `json:"harness_only_ids"`
+	ProfileTimes map[string]int            `json:"profile_times_ms"` // legacy, kept for compat
+	Profiles     map[string]profilePerf    `json:"profile_perf"`
+	Wallclock    int64                     `json:"wallclock_us"`
+	Upstream     []upstreamTestParity      `json:"upstream_tests,omitempty"`
+}
+
+// profilePerf is the per-profile perf breakdown the bench emits.
+type profilePerf struct {
+	BrokerBootUS int `json:"broker_boot_us"`
+	DriveUS      int `json:"drive_us"`
+	EvalUS       int `json:"eval_us"`
+	TotalUS      int `json:"total_us"`
+	Events       int `json:"events_captured"`
+	Results      int `json:"results_emitted"`
+	Scenarios    int `json:"scenarios"`
 }
 
 // upstreamTest is the on-disk shape of one upstream-tck inventory entry
@@ -78,11 +91,13 @@ func main() {
 		passiveIDs[a.ID] = true
 	}
 
-	harnessIDs, profileTimes, err := harnessCoverage()
+	wallStart := time.Now()
+	harnessIDs, profileTimes, profilePerfs, err := harnessCoverage()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "harness coverage: %v\n", err)
 		os.Exit(1)
 	}
+	wallclock := time.Since(wallStart)
 
 	union := map[string]bool{}
 	for id := range passiveIDs {
@@ -109,6 +124,8 @@ func main() {
 		UncoveredIDs: uncovered,
 		HarnessOnly:  harnessOnly,
 		ProfileTimes: profileTimes,
+		Profiles:     profilePerfs,
+		Wallclock:    wallclock.Microseconds(),
 		Upstream:     upstreamRows,
 	}
 
@@ -123,25 +140,43 @@ func main() {
 
 // harnessCoverage runs each profile against a compliant synthetic SUT
 // driven through the in-process broker, collects the set of assertion
-// IDs the profile emits, and times the evaluation.
-func harnessCoverage() (map[string]bool, map[string]int, error) {
+// IDs the profile emits, and breaks the wallclock down by phase.
+func harnessCoverage() (map[string]bool, map[string]int, map[string]profilePerf, error) {
 	ids := map[string]bool{}
 	times := map[string]int{}
+	perfs := map[string]profilePerf{}
 	for name, p := range harness.Profiles {
+		bootStart := time.Now()
 		b, err := harness.NewBroker()
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
+		bootUS := time.Since(bootStart).Microseconds()
+
+		driveStart := time.Now()
 		drive(name, b)
-		start := time.Now()
+		driveUS := time.Since(driveStart).Microseconds()
+
+		evalStart := time.Now()
 		results := p.Run(b)
-		times[name] = int(time.Since(start).Milliseconds())
+		evalUS := time.Since(evalStart).Microseconds()
+
 		for _, r := range results {
 			ids[r.AssertionID] = true
 		}
+		times[name] = int(evalUS / 1000) // legacy ms field
+		perfs[name] = profilePerf{
+			BrokerBootUS: int(bootUS),
+			DriveUS:      int(driveUS),
+			EvalUS:       int(evalUS),
+			TotalUS:      int(bootUS + driveUS + evalUS),
+			Events:       len(b.Events()),
+			Results:      len(results),
+			Scenarios:    len(p.Scenarios),
+		}
 		_ = b.Close()
 	}
-	return ids, times, nil
+	return ids, times, perfs, nil
 }
 
 // drive replays a known-good lifecycle for the named profile through the
@@ -236,19 +271,30 @@ func printMarkdown(w *os.File, r report) {
 	fmt.Fprintf(w, "| Harness only | %d | %s |\n", r.HarnessIDs, pct(r.HarnessIDs))
 	fmt.Fprintf(w, "| Union (passive ∪ harness) | %d | %s |\n", r.UnionIDs, pct(r.UnionIDs))
 	fmt.Fprintln(w)
-	if len(r.ProfileTimes) > 0 {
-		fmt.Fprintln(w, "## Harness profile timings")
+	if len(r.Profiles) > 0 {
+		fmt.Fprintln(w, "## Harness profile perf")
 		fmt.Fprintln(w)
-		fmt.Fprintln(w, "| Profile | Eval time (ms) |")
-		fmt.Fprintln(w, "|---------|----------------|")
-		names := make([]string, 0, len(r.ProfileTimes))
-		for n := range r.ProfileTimes {
+		fmt.Fprintln(w, "Per-profile breakdown of broker boot, synthetic SUT drive, and scenario evaluation. All times in microseconds (μs).")
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "```")
+		fmt.Fprintln(w, "Profile           Boot     Drive     Eval     Total   Events   Results   Scenarios")
+		fmt.Fprintln(w, "----------------  -------  --------  -------  ------  -------  --------  ---------")
+		names := make([]string, 0, len(r.Profiles))
+		for n := range r.Profiles {
 			names = append(names, n)
 		}
 		sort.Strings(names)
 		for _, n := range names {
-			fmt.Fprintf(w, "| %s | %d |\n", n, r.ProfileTimes[n])
+			p := r.Profiles[n]
+			fmt.Fprintf(w, "%-16s  %7d  %8d  %7d  %6d  %7d  %8d  %9d\n",
+				n, p.BrokerBootUS, p.DriveUS, p.EvalUS, p.TotalUS,
+				p.Events, p.Results, p.Scenarios)
 		}
+		fmt.Fprintln(w, "```")
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "Total wallclock (broker boot + drive + eval, both profiles): **%d μs (%.1f ms)**\n\n",
+			r.Wallclock, float64(r.Wallclock)/1000.0)
+		fmt.Fprintln(w, "_Reference: the upstream Eclipse Sparkplug TCK requires HiveMQ + JVM warmup before a single SUT can connect. Typical cold-start is ~10s before the first assertion runs. This Go bench loads, drives a synthetic SUT, scores every scenario, and emits a parity report in a single binary launch._")
 		fmt.Fprintln(w)
 	}
 	if len(r.Upstream) > 0 {
