@@ -1,0 +1,81 @@
+name: parity
+
+on:
+  schedule:
+    # Daily 04:00 UTC — catches regressions in either engine within a day.
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Stage upstream HiveMQ home
+        # Pulls the upstream tarball, runs gradle :tck:prepareHivemqHome
+        # to assemble a self-contained HiveMQ install with the TCK
+        # extension wired in. Cached between runs by gradle's own cache.
+        run: |
+          bash scripts/update-upstream-inventory.sh
+          cd .upstream-tck-cache/sparkplug-master
+          ./gradlew :tck:prepareHivemqHome
+
+      - name: Boot HiveMQ + TCK extension
+        run: bash scripts/upstream-tck/start-hivemq.sh
+
+      - name: Run upstream Java TCK against synthetic SUT
+        run: |
+          go build ./cmd/sparkplug-tck-correctness
+          ./sparkplug-tck-correctness > java.json
+
+      - name: Run Go bench
+        run: |
+          go build ./cmd/sparkplug-tck-bench
+          ./sparkplug-tck-bench -json > go.json
+
+      - name: Diff Java vs Go verdicts
+        run: |
+          go build ./cmd/sparkplug-tck-diff
+          ./sparkplug-tck-diff -java java.json -go go.json -json > diff.json
+          python3 - <<'PY'
+          import json, sys
+          d = json.load(open('diff.json'))
+          o = d['overall']
+          conflicts = o.get('disagree', 0)
+          agree = o.get('agree', 0)
+          coverage = o.get('coverage', 0)
+          pct = float(o.get('logic_agreement_pct', 0))
+          print(f"agree={agree} conflict={conflicts} coverage={coverage} logic_agreement={pct:.1f}%")
+          # Fail on any logic conflict. Coverage Δ is fine — it's the
+          # per-test/per-profile scoping artefact, not a real disagreement.
+          if conflicts > 0:
+              sys.exit(f"{conflicts} logic conflict(s) — see diff.json artefact")
+          if pct < 99.0:
+              sys.exit(f"logic agreement {pct:.1f}% < floor 99%")
+          PY
+
+      - name: Tear down HiveMQ
+        if: always()
+        run: bash scripts/upstream-tck/stop-hivemq.sh || true
+
+      - name: Upload artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-verdicts
+          path: |
+            java.json
+            go.json
+            diff.json

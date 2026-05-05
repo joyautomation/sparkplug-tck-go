@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	_ "github.com/joyautomation/sparkplug-tck-go/internal/assertions"
@@ -31,6 +32,7 @@ type catalogEntry struct {
 
 type report struct {
 	CatalogTotal int                       `json:"catalog_total"`
+	OutOfScope   []string                  `json:"out_of_scope_ids"`
 	PassiveIDs   int                       `json:"passive_ids"`
 	HarnessIDs   int                       `json:"harness_ids"`
 	UnionIDs     int                       `json:"union_ids"`
@@ -81,11 +83,25 @@ func main() {
 	jsonOut := flag.Bool("json", false, "emit JSON report instead of Markdown")
 	flag.Parse()
 
-	cat, err := loadCatalog(*catalog)
+	rawCat, err := loadCatalog(*catalog)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load catalog: %v\n", err)
 		os.Exit(1)
 	}
+	// Filter the catalog down to client-conformance IDs. Broker
+	// conformance (`tck-id-conformance-mqtt-*`) is intentionally out of
+	// scope — the upstream Java TCK is the right tool for those, and
+	// counting them in our denominator would understate client parity.
+	cat := make([]catalogEntry, 0, len(rawCat))
+	outOfScope := []string{}
+	for _, a := range rawCat {
+		if isOutOfScope(a.ID) {
+			outOfScope = append(outOfScope, a.ID)
+			continue
+		}
+		cat = append(cat, a)
+	}
+	sort.Strings(outOfScope)
 	catIDs := map[string]bool{}
 	for _, a := range cat {
 		catIDs[a.ID] = true
@@ -123,6 +139,7 @@ func main() {
 
 	rep := report{
 		CatalogTotal: len(cat),
+		OutOfScope:   outOfScope,
 		PassiveIDs:   countCovered(catIDs, passiveIDs),
 		HarnessIDs:   countCovered(catIDs, harnessIDs),
 		UnionIDs:     countCovered(catIDs, union),
@@ -256,6 +273,12 @@ func loadUpstream(path string) ([]upstreamTest, error) {
 func upstreamParity(tests []upstreamTest, harness map[string]bool) []upstreamTestParity {
 	out := make([]upstreamTestParity, 0, len(tests))
 	for _, t := range tests {
+		// Skip upstream broker test classes — broker conformance is out
+		// of scope (see isOutOfScope) so reporting their misses against
+		// our parity number would be dishonest.
+		if strings.HasPrefix(t.File, "broker/") {
+			continue
+		}
 		hit := 0
 		var miss []string
 		for _, id := range t.IDs {
@@ -270,6 +293,16 @@ func upstreamParity(tests []upstreamTest, harness map[string]bool) []upstreamTes
 		})
 	}
 	return out
+}
+
+// isOutOfScope marks IDs that this project intentionally doesn't grade.
+// Broker conformance (`tck-id-conformance-mqtt-*`) — both basic and
+// "Sparkplug-aware" — measures broker behaviour, not client behaviour.
+// The upstream Java TCK is the right tool for that. Excluding these
+// from the catalog total keeps the parity numbers honest about what we
+// actually claim to cover.
+func isOutOfScope(id string) bool {
+	return strings.HasPrefix(id, "tck-id-conformance-mqtt-")
 }
 
 func loadCatalog(path string) ([]catalogEntry, error) {

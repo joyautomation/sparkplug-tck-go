@@ -28,8 +28,8 @@ jobs:
           d = json.load(open('bench.json'))
           # Floor below current parity so flake doesn't break CI; raise as
           # we close the remaining 19 uncovered IDs.
-          floor_union = 0.93
-          floor_upstream = 0.92
+          floor_union = 0.97
+          floor_upstream = 0.97
           union = d['union_ids'] / d['catalog_total']
           tests = d.get('upstream_tests') or []
           total = sum(t['ids'] for t in tests)
