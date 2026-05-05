@@ -6,7 +6,7 @@ The official TCK is a Java/HiveMQ stack: ~10s JVM warmup, heavyweight to run as 
 
 ## Status
 
-Early but executable. Assertion catalog is extracted; the runner, session tracker, MQTT capture, and 60 of 274 assertions are wired. The CLI runs against either a JSON fixture or a live MQTT broker.
+Early but executable. Assertion catalog is extracted; the runner, session tracker, MQTT capture, and 72 of 274 assertions are wired. The CLI runs against either a JSON fixture or a live MQTT broker.
 
 ## Parity strategy
 
@@ -85,6 +85,26 @@ tck-id-payloads-metric-datatype-value-type
 tck-id-payloads-name-requirement
 ```
 
+DataSet structural rules (types/columns parallel arrays, type enum):
+```
+tck-id-payloads-dataset-parameter-type-req
+tck-id-payloads-dataset-types-num
+tck-id-payloads-dataset-column-num-headers
+tck-id-payloads-dataset-column-size
+tck-id-payloads-dataset-types-def
+tck-id-payloads-dataset-types-type
+tck-id-payloads-dataset-types-value
+```
+
+PropertySet + PropertyValue structural rules:
+```
+tck-id-payloads-propertyset-keys-array-size
+tck-id-payloads-propertyset-values-array-size
+tck-id-payloads-metric-propertyvalue-type-req
+tck-id-payloads-metric-propertyvalue-type-type
+tck-id-payloads-metric-propertyvalue-type-value
+```
+
 DBIRTH / DDATA / DDEATH / NDATA envelope (QoS, retain, seq, timestamp):
 ```
 tck-id-payloads-dbirth-qos
@@ -144,7 +164,7 @@ tck-id-operational-behavior-data-commands-rebirth-datatype
 tck-id-operational-behavior-data-commands-rebirth-name-aliases
 ```
 
-60 of 274. Many of the remaining assertions reduce to additional
+72 of 274. Many of the remaining assertions reduce to additional
 `messageRule` entries (see `internal/assertions/message_rules.go`).
 
 ## Regenerating the catalog
