@@ -115,10 +115,18 @@ type seqGap struct {
 	ndataTopic string    // edge's NDATA/<edge> topic, or ""
 }
 
-// findSeqGaps walks NBIRTH/NDATA/DDATA events grouped by (group,edge)
-// and returns each instance where seq jumped non-monotonically. NBIRTH
-// resets the expected sequence to 0; subsequent N/DDATA must increment
-// by 1 modulo 256.
+// findSeqGaps walks NBIRTH/DBIRTH/NDATA/DDATA/DDEATH events grouped by
+// (group,edge) and returns each instance where seq jumped non-monotonically.
+// Per Sparkplug B 3.0 §6.4.6, NBIRTH establishes seq=0 and EVERY subsequent
+// data-bearing message — DBIRTH, NDATA, DDATA, DDEATH — increments the same
+// seq counter by 1 modulo 256. Tracking only NDATA/DDATA misses DBIRTH's
+// consumption of seq=1, which would mis-flag a normal NBIRTH(0)/DBIRTH(1)/
+// DDATA(2) stream as a gap and demand a rebirth from a well-behaved edge.
+//
+// We treat the gap as detected only on data-bearing topics (NDATA/DDATA),
+// because those are the ones a host could plausibly act on with a rebirth;
+// a DBIRTH out-of-order gap is rarer in practice and the assertions below
+// frame "host-reordering" in terms of NDATA/DDATA recovery.
 func findSeqGaps(events []Event) []seqGap {
 	type key struct{ group, edge string }
 	type state struct {
@@ -134,16 +142,23 @@ func findSeqGaps(events []Event) []seqGap {
 		}
 		t := e.Topic
 		var grp, edge, devData string
-		var isBirth bool
+		var isBirth, isData bool
 		switch {
 		case isNBIRTHTopic(t):
 			grp, edge = topicParts2(t)
 			isBirth = true
-		case isNDATATopic(t):
-			grp, edge = topicParts2(t)
-		case isDDATATopic(t):
+		case isDBIRTHTopic(t):
 			grp, edge, devData = topicParts3(t)
 			_ = devData
+		case isDDEATHTopic(t):
+			grp, edge, devData = topicParts3(t)
+			_ = devData
+		case isNDATATopic(t):
+			grp, edge = topicParts2(t)
+			isData = true
+		case isDDATATopic(t):
+			grp, edge, devData = topicParts3(t)
+			isData = true
 		default:
 			continue
 		}
@@ -165,7 +180,7 @@ func findSeqGaps(events []Event) []seqGap {
 			s.seen = true
 			continue
 		}
-		if seq != s.next {
+		if seq != s.next && isData {
 			gap := seqGap{
 				at:         e.At,
 				missing:    s.next,
