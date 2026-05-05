@@ -6,7 +6,7 @@ The official TCK is a Java/HiveMQ stack: ~10s JVM warmup, heavyweight to run as 
 
 ## Status
 
-Early but executable. Assertion catalog is extracted; the runner, session tracker, MQTT capture, and 72 of 274 assertions are wired. The CLI runs against either a JSON fixture or a live MQTT broker.
+Early but executable. Assertion catalog is extracted; the runner, session tracker, MQTT capture, and 100 of 274 assertions are wired. The CLI runs against either a JSON fixture or a live MQTT broker.
 
 ## Parity strategy
 
@@ -105,6 +105,23 @@ tck-id-payloads-metric-propertyvalue-type-type
 tck-id-payloads-metric-propertyvalue-type-value
 ```
 
+Topic-structure + message-flow aliases (chapters 4 + 5 restate chapter 6
+constraints under their own ID namespaces):
+```
+tck-id-topic-structure-namespace-valid-group-id
+tck-id-topic-structure-namespace-valid-edge-node-id
+tck-id-topic-structure-namespace-valid-device-id
+tck-id-topic-structure-namespace-device-id-associated-message-types
+tck-id-topic-structure-namespace-device-id-non-associated-message-types
+tck-id-topic-structure-namespace-unique-edge-node-descriptor
+tck-id-topic-structure-namespace-unique-device-id
+tck-id-topic-structure-namespace-duplicate-device-id-across-edge-node
+tck-id-message-flow-edge-node-birth-publish-{nbirth-payload,nbirth-payload-bdSeq,nbirth-payload-seq,nbirth-qos,nbirth-retained,nbirth-topic,connect}
+tck-id-message-flow-edge-node-birth-publish-will-message{,-payload,-payload-bdSeq,-qos,-topic,-will-retained}
+tck-id-message-flow-device-birth-publish-dbirth-{payload,payload-seq,qos,retained,topic,match-edge-node-topic}
+tck-id-message-flow-device-birth-publish-nbirth-wait
+```
+
 DBIRTH / DDATA / DDEATH / NDATA envelope (QoS, retain, seq, timestamp):
 ```
 tck-id-payloads-dbirth-qos
@@ -164,7 +181,7 @@ tck-id-operational-behavior-data-commands-rebirth-datatype
 tck-id-operational-behavior-data-commands-rebirth-name-aliases
 ```
 
-72 of 274. Many of the remaining assertions reduce to additional
+100 of 274. Many of the remaining assertions reduce to additional
 `messageRule` entries (see `internal/assertions/message_rules.go`).
 
 ## Regenerating the catalog

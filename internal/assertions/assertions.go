@@ -36,13 +36,7 @@ func init() {
 }
 
 func nbirthSeqAlias(aliasID string) runner.AssertionFn {
-	return func(c *runner.Capture) []runner.Result {
-		results := nbirthSeqPayload(c)
-		for i := range results {
-			results[i].AssertionID = aliasID
-		}
-		return results
-	}
+	return aliasOf(nbirthSeqPayload, aliasID)
 }
 
 // seqAlwaysIncluded: every Sparkplug edge message except NDEATH must carry
@@ -363,15 +357,13 @@ func seqIncrementing(c *runner.Capture) []runner.Result {
 	return out
 }
 
-// nbirthBdSeqAlias and ndeathBdSeqMatchesAlias re-export the same checks
-// under additional spec IDs (chapter 4 phrases the bdSeq rules under
-// `tck-id-topics-nbirth-bdseq-*`; chapter 6 calls them
-// `tck-id-payloads-{nbirth,ndeath}-bdseq*`). The runner needs a distinct
-// AssertionFn per registered ID — these helpers rewrite the inner ID so
-// results report under the alias.
-func nbirthBdSeqAlias(aliasID string) runner.AssertionFn {
+// aliasOf wraps an existing AssertionFn so its results report under a
+// different spec ID. Many spec IDs across chapters 4/5/6 reduce to checks
+// already wired under chapter-6 [tck-id-payloads-*] names — instead of
+// duplicating logic, register the same function under each alias.
+func aliasOf(fn runner.AssertionFn, aliasID string) runner.AssertionFn {
 	return func(c *runner.Capture) []runner.Result {
-		results := nbirthBdSeq(c)
+		results := fn(c)
 		for i := range results {
 			results[i].AssertionID = aliasID
 		}
@@ -379,14 +371,12 @@ func nbirthBdSeqAlias(aliasID string) runner.AssertionFn {
 	}
 }
 
+func nbirthBdSeqAlias(aliasID string) runner.AssertionFn {
+	return aliasOf(nbirthBdSeq, aliasID)
+}
+
 func ndeathBdSeqMatchesAlias(aliasID string) runner.AssertionFn {
-	return func(c *runner.Capture) []runner.Result {
-		results := ndeathBdSeqMatches(c)
-		for i := range results {
-			results[i].AssertionID = aliasID
-		}
-		return results
-	}
+	return aliasOf(ndeathBdSeqMatches, aliasID)
 }
 
 // hasBdSeq is a thin wrapper used by NBIRTH-bdSeq assertions; bdSeqOf
