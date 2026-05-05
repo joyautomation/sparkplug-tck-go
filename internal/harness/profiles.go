@@ -68,6 +68,8 @@ var HostApplicationProfile = Profile{
 		HostMessageOrdering,
 		HostNDEATHActions,
 		HostDDEATHActions,
+		HostWillCompliant,
+		HostBirthCompliant,
 	},
 }
 
