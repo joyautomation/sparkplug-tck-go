@@ -66,10 +66,22 @@ type counts struct {
 	Total       int `json:"total"`
 }
 
-// defaultTestSet is the small spread the bench uses out-of-the-box —
-// covers both SUT profiles and an "edge data" path so we sample more
-// than the session-handshake corner of the spec.
-const defaultTestSet = "edge SessionEstablishmentTest,edge SendDataTest,host SessionEstablishmentTest"
+// defaultTestSet covers every in-scope upstream test (broker/multi-broker
+// are out of scope per project policy). Some require richer SUT behavior
+// than the basic edge/host lifecycles — those will time out until their
+// driver is upgraded, but the orchestrator still captures partial
+// verdicts the upstream emitted before timeout.
+const defaultTestSet = "edge SessionEstablishmentTest," +
+	"edge SendDataTest," +
+	"edge SendComplexDataTest," +
+	"edge SessionTerminationTest," +
+	"edge ReceiveCommandTest," +
+	"edge PrimaryHostTest," +
+	"host SessionEstablishmentTest," +
+	"host SessionTerminationTest," +
+	"host EdgeSessionTerminationTest," +
+	"host MessageOrderingTest," +
+	"host SendCommandTest"
 
 func main() {
 	broker := flag.String("broker", "tcp://localhost:1883", "MQTT broker URL (HiveMQ + TCK extension)")
@@ -413,6 +425,7 @@ func driveCompliantHost(broker, host string) {
 
 	var (
 		mu        sync.Mutex
+		bornFlag  bool
 		responded bool
 		client    mqtt.Client
 	)
@@ -427,7 +440,11 @@ func driveCompliantHost(broker, host string) {
 		}
 		mu.Lock()
 		defer mu.Unlock()
-		if responded || client == nil || s.Online {
+		// Ignore retained messages delivered before we've published our birth,
+		// and ignore offline-state messages whose timestamp doesn't match our
+		// will (those are stale retained from a previous test). The TCK's
+		// provocation always echoes our will timestamp.
+		if !bornFlag || responded || client == nil || s.Online || s.Timestamp != birthTS {
 			return
 		}
 		// Respond to the TCK's offline provocation with a fresh BIRTH.
@@ -465,6 +482,9 @@ func driveCompliantHost(broker, host string) {
 	c.Subscribe(stateTopic, 1, nil).WaitTimeout(2 * time.Second)
 
 	c.Publish(stateTopic, 1, true, birthBody).WaitTimeout(2 * time.Second)
+	mu.Lock()
+	bornFlag = true
+	mu.Unlock()
 
 	// Hold the session open long enough for the TCK to send its offline
 	// provocation and observe our BIRTH-resend before we DISCONNECT.
