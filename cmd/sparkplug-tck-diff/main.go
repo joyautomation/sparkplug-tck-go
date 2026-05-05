@@ -255,6 +255,13 @@ func emitMarkdownMulti(javaTests []javaReport, gr goReport) {
 	fmt.Println("| --- | --- | --- | --- | --- | --- | --- | --- |")
 	var totalAgree, totalDisagree, totalCoverage int
 	for _, jr := range javaTests {
+		// INFRA_FAILED tests didn't run on the Java side (HiveMQ wedged
+		// mid-sweep, network blip, etc) — they have no verdicts to diff,
+		// so reporting per-ID misses against Go would be misleading.
+		if jr.Overall == "INFRA_FAILED" {
+			fmt.Printf("| %s | — | — | — | — | — | — | — |  *(infra failure, skipped)*\n", jr.Test)
+			continue
+		}
 		rows := buildRows(jr, gr)
 		t := count(rows)
 		totalAgree += t.agree
@@ -381,6 +388,10 @@ func emitJSONMulti(javaTests []javaReport, gr goReport) {
 	}
 	var c combined
 	for _, jr := range javaTests {
+		if jr.Overall == "INFRA_FAILED" {
+			c.Tests = append(c.Tests, perTest{Test: jr.Test, Overall: jr.Overall})
+			continue
+		}
 		rows := buildRows(jr, gr)
 		sort.Slice(rows, func(i, j int) bool { return rows[i].ID < rows[j].ID })
 		t := count(rows)
