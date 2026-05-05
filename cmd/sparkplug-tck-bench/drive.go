@@ -187,7 +187,9 @@ func ndataPayload(ts int64, seq uint64) []byte {
 func ddataPayload(ts int64, seq uint64) []byte {
 	tsU := uint64(ts)
 	intDT := uint32(spbpb.DataType_Int32)
+	tmplDT := uint32(spbpb.DataType_Template)
 	name := "Counter"
+	tmplName := "Motor1"
 	v := uint32(1)
 	p := &spbpb.Payload{
 		Timestamp: &tsU,
@@ -195,6 +197,12 @@ func ddataPayload(ts int64, seq uint64) []byte {
 		Metrics: []*spbpb.Payload_Metric{
 			{Name: &name, Datatype: &intDT, Timestamp: &tsU,
 				Value: &spbpb.Payload_Metric_IntValue{IntValue: v}},
+			// Template Instance update so template-instance-members-data
+			// can score (the assertion only fires on NDATA/DDATA).
+			{Name: &tmplName, Datatype: &tmplDT, Timestamp: &tsU,
+				Value: &spbpb.Payload_Metric_TemplateValue{
+					TemplateValue: motorTemplate(false /*instance*/),
+				}},
 		},
 	}
 	raw, _ := proto.Marshal(p)
