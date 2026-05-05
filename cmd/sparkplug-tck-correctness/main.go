@@ -285,8 +285,11 @@ func (c *collector) startTest(profile, name string, args []string) error {
 	parts := append([]string{"NEW_TEST", profile, name}, args...)
 	payload := strings.Join(parts, " ")
 	tok := c.c.Publish(topicTestControl, 1, false, payload)
-	if !tok.WaitTimeout(2*time.Second) || tok.Error() != nil {
-		return fmt.Errorf("publish NEW_TEST: %v", tok.Error())
+	if !tok.WaitTimeout(10 * time.Second) {
+		return fmt.Errorf("publish NEW_TEST: timed out waiting for QoS1 ack after 10s")
+	}
+	if err := tok.Error(); err != nil {
+		return fmt.Errorf("publish NEW_TEST: %v", err)
 	}
 	time.Sleep(500 * time.Millisecond)
 	return nil
@@ -304,8 +307,11 @@ func (c *collector) reset() {
 
 func (c *collector) endTest() error {
 	tok := c.c.Publish(topicTestControl, 1, false, "END_TEST")
-	if !tok.WaitTimeout(2*time.Second) || tok.Error() != nil {
-		return fmt.Errorf("publish END_TEST: %v", tok.Error())
+	if !tok.WaitTimeout(10 * time.Second) {
+		return fmt.Errorf("publish END_TEST: timed out waiting for QoS1 ack after 10s")
+	}
+	if err := tok.Error(); err != nil {
+		return fmt.Errorf("publish END_TEST: %v", err)
 	}
 	return nil
 }
