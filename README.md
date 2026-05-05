@@ -194,7 +194,30 @@ tck-id-operational-behavior-data-commands-dcmd-verb
 tck-id-operational-behavior-host-application-death-{qos,retained,topic}
 ```
 
-123 of 274. Many of the remaining assertions reduce to additional
+Templates (per-Template structural + per-parameter rules; cross-shape
+member/parameter parity deferred until a session-level template registry):
+```
+tck-id-payloads-template-is-definition
+tck-id-payloads-template-is-definition-{definition,instance}
+tck-id-payloads-template-instance-is-definition
+tck-id-payloads-template-ref-{definition,instance}
+tck-id-payloads-template-instance-ref
+tck-id-payloads-template-parameter-{name-required,name-type}
+tck-id-payloads-template-parameter-type-{req,value}
+tck-id-payloads-template-parameter-value
+tck-id-payloads-template-parameter-value-type
+```
+
+Metric alias rules (BIRTH name+alias binding, DATA/CMD alias-only,
+per-edge-node uniqueness) and PropertySet "Quality" property:
+```
+tck-id-payloads-alias-birth-requirement
+tck-id-payloads-alias-data-cmd-requirement
+tck-id-payloads-alias-uniqueness
+tck-id-payloads-propertyset-quality-value-{type,value}
+```
+
+141 of 274. Many of the remaining assertions reduce to additional
 `messageRule` entries (see `internal/assertions/message_rules.go`).
 
 ## Regenerating the catalog
