@@ -36,6 +36,8 @@ var EdgeNodeProfile = Profile{
 		NDEATHBeforeDisconnect,
 		EdgeBdSeqMatchesWill,
 		EdgeBdSeqIncrements,
+		WillNotFiredOnCleanDisconnect,
+		EdgeRespondsToRebirth,
 	},
 }
 

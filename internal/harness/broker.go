@@ -90,6 +90,9 @@ func NewBrokerAt(bind string) (*Broker, error) {
 	srv := mqtt.New(&mqtt.Options{
 		// Silence server logs; tests can re-enable by replacing srv.Log.
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		// InlineClient lets the harness publish stimuli (e.g. NCMD/Rebirth)
+		// through srv.Publish so scenarios can score the SUT's response.
+		InlineClient: true,
 	})
 	if err := srv.AddHook(new(auth.AllowHook), nil); err != nil {
 		return nil, fmt.Errorf("install auth: %w", err)
@@ -127,6 +130,14 @@ func (b *Broker) Events() []Event {
 
 func (b *Broker) Close() error {
 	return b.server.Close()
+}
+
+// Publish injects a message into the broker as if a connected client
+// had sent it. The harness CLI uses this for stimuli (e.g. publishing
+// NCMD/Rebirth at a known instant so the scenario can score the
+// edge's response).
+func (b *Broker) Publish(topic string, payload []byte, retain bool, qos byte) error {
+	return b.server.Publish(topic, payload, retain, qos)
 }
 
 func (b *Broker) record(e Event) {

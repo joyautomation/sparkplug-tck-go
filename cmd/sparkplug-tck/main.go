@@ -28,6 +28,8 @@ import (
 	"github.com/joyautomation/sparkplug-tck-go/internal/harness"
 	"github.com/joyautomation/sparkplug-tck-go/internal/runner"
 	"github.com/joyautomation/sparkplug-tck-go/internal/spb"
+	"github.com/joyautomation/sparkplug-tck-go/internal/spbpb"
+	"google.golang.org/protobuf/proto"
 )
 
 // fixtureFile is the on-disk shape:
@@ -63,6 +65,8 @@ func main() {
 	harnessMode := flag.Bool("harness", false, "run an in-process broker; SUT connects to it")
 	harnessBind := flag.String("listen", "127.0.0.1:1883", "harness broker bind address")
 	profile := flag.String("profile", "", "harness profile: "+strings.Join(profileNames(), ", "))
+	rebirthEdge := flag.String("rebirth", "", "harness stimulus: publish NCMD/Rebirth to <group>/<edge> (e.g. TestGroup/TestNode)")
+	rebirthAfter := flag.Duration("rebirth-after", 5*time.Second, "delay before publishing the rebirth stimulus")
 	flag.Parse()
 
 	modes := 0
@@ -81,7 +85,7 @@ func main() {
 	}
 
 	if *harnessMode {
-		if err := runHarness(*harnessBind, *profile, *duration, *jsonOut); err != nil {
+		if err := runHarness(*harnessBind, *profile, *duration, *jsonOut, *rebirthEdge, *rebirthAfter); err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
 		}
@@ -230,7 +234,9 @@ func printHuman(w io.Writer, results []runner.Result) {
 // against everything the broker recorded. The same printHuman / JSON
 // emitters are reused so harness output is interchangeable with passive
 // output.
-func runHarness(bind, profileName string, duration time.Duration, jsonOut bool) error {
+func runHarness(bind, profileName string, duration time.Duration, jsonOut bool,
+	rebirthEdge string, rebirthAfter time.Duration,
+) error {
 	prof, ok := harness.Profiles[profileName]
 	if !ok {
 		return fmt.Errorf("unknown profile %q (have: %s)", profileName,
@@ -250,6 +256,11 @@ func runHarness(bind, profileName string, duration time.Duration, jsonOut bool) 
 	ctx, cancel := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
+
+	if rebirthEdge != "" {
+		go scheduleRebirth(ctx, b, rebirthEdge, rebirthAfter)
+	}
+
 	timer := time.NewTimer(duration)
 	defer timer.Stop()
 	select {
@@ -288,6 +299,43 @@ func profileNames() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// scheduleRebirth waits for `after` (or until ctx is cancelled) then
+// publishes a Sparkplug NCMD/Rebirth ("Node Control/Rebirth"=true) to
+// the edge's NCMD topic via the harness broker's inline client.
+// `edge` is "<group>/<node>"; the published topic is
+// spBv1.0/<group>/NCMD/<node>.
+func scheduleRebirth(ctx context.Context, b *harness.Broker, edge string, after time.Duration) {
+	parts := strings.SplitN(edge, "/", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		fmt.Fprintf(os.Stderr, "rebirth: invalid edge %q (want <group>/<node>)\n", edge)
+		return
+	}
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(after):
+	}
+	topic := fmt.Sprintf("spBv1.0/%s/NCMD/%s", parts[0], parts[1])
+	dt := uint32(spbpb.DataType_Boolean)
+	name := "Node Control/Rebirth"
+	tru := true
+	p := &spbpb.Payload{Metrics: []*spbpb.Payload_Metric{{
+		Name:     &name,
+		Datatype: &dt,
+		Value:    &spbpb.Payload_Metric_BooleanValue{BooleanValue: tru},
+	}}}
+	raw, err := proto.Marshal(p)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "rebirth: marshal payload: %v\n", err)
+		return
+	}
+	if err := b.Publish(topic, raw, false, 1); err != nil {
+		fmt.Fprintf(os.Stderr, "rebirth: publish %s: %v\n", topic, err)
+		return
+	}
+	fmt.Fprintf(os.Stderr, "rebirth: published NCMD/Rebirth to %s\n", topic)
 }
 
 func hasFail(results []runner.Result) bool {
