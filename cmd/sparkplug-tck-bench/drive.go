@@ -42,6 +42,19 @@ func driveEdge(b *harness.Broker) {
 	seq++
 	c.Publish("spBv1.0/G/DDATA/N/D", 0, false, ddataPayload(time.Now().UnixMilli(), seq)).WaitTimeout(2 * time.Second)
 	seq++
+
+	// Inject an NCMD/Rebirth + spec-compliant response (NBIRTH + DBIRTH
+	// with bdSeq UNCHANGED, fresh seq=0/1) so EdgeRespondsToRebirth /
+	// EdgeRebirthHaltsData / EdgeRebirthBdSeqUnchanged score against a
+	// real observation pair. Mirrors the orchestrator's NCMD rebirth
+	// handler — both engines need to see this dance to PASS rebirth-action-*.
+	c.Publish("spBv1.0/G/NCMD/N", 0, false, ncmdRebirthPayload(time.Now().UnixMilli())).WaitTimeout(2 * time.Second)
+	time.Sleep(50 * time.Millisecond) // ensure NBIRTH timestamp is strictly after NCMD
+	rebirthNow := time.Now().UnixMilli()
+	c.Publish("spBv1.0/G/NBIRTH/N", 0, false, nbirthPayload(rebirthNow, 0, 0)).WaitTimeout(2 * time.Second)
+	c.Publish("spBv1.0/G/DBIRTH/N/D", 0, false, dbirthPayload(rebirthNow, 1)).WaitTimeout(2 * time.Second)
+	seq = 2
+
 	c.Publish("spBv1.0/G/DDEATH/N/D", 0, false, ddeathPayload(time.Now().UnixMilli(), seq)).WaitTimeout(2 * time.Second)
 	c.Publish("spBv1.0/G/NDEATH/N", 0, false, bdSeqPayload(0)).WaitTimeout(2 * time.Second)
 	c.Disconnect(200)
@@ -50,7 +63,7 @@ func driveEdge(b *harness.Broker) {
 
 func nbirthPayload(ts int64, seq, bdSeq uint64) []byte {
 	tsU := uint64(ts)
-	bdSeqDT := uint32(spbpb.DataType_UInt64)
+	bdSeqDT := uint32(spbpb.DataType_Int64)
 	boolDT := uint32(spbpb.DataType_Boolean)
 	intDT := uint32(spbpb.DataType_Int32)
 	tmplDT := uint32(spbpb.DataType_Template)
@@ -311,7 +324,9 @@ type stateBody struct {
 }
 
 func bdSeqPayload(seq uint64) []byte {
-	dt := uint32(spbpb.DataType_UInt64)
+	// Java TCK Monitor strictly checks bdSeq datatype == Int64 per
+	// spec text. Match that to keep orchestrator/bench in lockstep.
+	dt := uint32(spbpb.DataType_Int64)
 	name := "bdSeq"
 	v := seq
 	p := &spbpb.Payload{Metrics: []*spbpb.Payload_Metric{{

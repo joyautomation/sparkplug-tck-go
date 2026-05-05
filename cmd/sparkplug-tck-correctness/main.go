@@ -112,6 +112,12 @@ func main() {
 	}
 	defer ctrl.close()
 
+	// Per-invocation suffix so reused IDs don't collide with stale state
+	// inside the long-lived HiveMQ extension (Monitor.edgeBdSeqs is never
+	// cleared — a second sweep reusing TCKEdge0 would see prev bdSeq=0
+	// AND new bdSeq=0 and FAIL the increment check).
+	runSuffix := fmt.Sprintf("%d", time.Now().UnixNano())
+
 	reports := make([]report, 0, len(specs))
 	for i, spec := range specs {
 		profile, testName, err := parseSpec(spec)
@@ -124,9 +130,10 @@ func main() {
 
 		// Use unique edge/host IDs per run so the TCK extension never
 		// thinks "this SUT was already seen this session" — the second
-		// run after that diagnosis would otherwise time out.
-		runEdge := fmt.Sprintf("%s%d", *edgeID, i)
-		runHost := fmt.Sprintf("%s%d", *hostID, i)
+		// run after that diagnosis would otherwise time out. Suffix is
+		// per-invocation to avoid stale state across sweeps.
+		runEdge := fmt.Sprintf("%s%s-%d", *edgeID, runSuffix, i)
+		runHost := fmt.Sprintf("%s%s-%d", *hostID, runSuffix, i)
 
 		var args []string
 		var driver func()
@@ -414,62 +421,160 @@ func (c *collector) close() {
 
 // driveCompliantEdge runs a minimal-but-spec-compliant edge node
 // lifecycle: NDEATH Will + bdSeq, NBIRTH (bdSeq + Node Control/Rebirth +
-// timestamp + seq=0), per-device DBIRTH (seq=1+), NDATA, DDATA, DDEATH,
-// NDEATH on disconnect. Enough for SessionEstablishment / SendData to
-// reach a verdict on every assertion ID they track.
+// timestamp + seq=0), per-device DBIRTH (seq=1+), NDATA, DDATA, then
+// holds the session open to respond to NCMD/Rebirth (republish NBIRTH +
+// DBIRTH, bdSeq UNCHANGED per spec — no new CONNECT happened), then
+// DDEATH + NDEATH on clean disconnect. ReceiveCommandTest needs the
+// rebirth response to PASS rebirth-action-1/2.
 func driveCompliantEdge(broker, _, group, edge, device string) {
 	clientID := "tck-correctness-edge-" + edge
 	willTopic := fmt.Sprintf("spBv1.0/%s/NDEATH/%s", group, edge)
+	ncmdTopic := fmt.Sprintf("spBv1.0/%s/NCMD/%s", group, edge)
 
 	bdSeq := uint64(0)
 	willPayload := bdSeqPayload(bdSeq)
+
+	var (
+		mu              sync.Mutex
+		c               mqtt.Client
+		seq             uint64
+		rebirthInFlight bool
+	)
+
+	rebirth := func() {
+		mu.Lock()
+		cli := c
+		if cli == nil {
+			mu.Unlock()
+			return
+		}
+		rebirthInFlight = true
+		seq = 0
+		mu.Unlock()
+
+		now := time.Now().UnixMilli()
+		// Spec: NBIRTH after Rebirth resets seq to 0; bdSeq UNCHANGED
+		// because no new MQTT CONNECT occurred.
+		cli.Publish(fmt.Sprintf("spBv1.0/%s/NBIRTH/%s", group, edge), 0, false,
+			nbirthPayload(now, 0, bdSeq)).WaitTimeout(2 * time.Second)
+		mu.Lock()
+		seq = 1
+		mu.Unlock()
+		cli.Publish(fmt.Sprintf("spBv1.0/%s/DBIRTH/%s/%s", group, edge, device), 0, false,
+			dbirthPayload(now, 1)).WaitTimeout(2 * time.Second)
+		mu.Lock()
+		seq = 2
+		rebirthInFlight = false
+		mu.Unlock()
+	}
 
 	opts := mqtt.NewClientOptions().
 		AddBroker(broker).
 		SetClientID(clientID).
 		SetCleanSession(true).
 		SetConnectTimeout(5 * time.Second).
-		SetBinaryWill(willTopic, willPayload, 1, false)
-	c := mqtt.NewClient(opts)
+		SetBinaryWill(willTopic, willPayload, 1, false).
+		// Paho's default auto-reconnect would re-CONNECT with the same
+		// bdSeq=0 after the TCK extension force-disconnects the edge,
+		// tripping Monitor:topics-nbirth-bdseq-increment in subsequent
+		// tests. Disable so each test sees exactly one CONNECT.
+		SetAutoReconnect(false).
+		SetDefaultPublishHandler(func(_ mqtt.Client, msg mqtt.Message) {
+			if msg.Topic() != ncmdTopic {
+				return
+			}
+			if isRebirthCommand(msg.Payload()) {
+				go rebirth()
+			}
+		})
+	c = mqtt.NewClient(opts)
 	if tok := c.Connect(); !tok.WaitTimeout(5*time.Second) || tok.Error() != nil {
 		return
 	}
 	defer c.Disconnect(200)
 
 	// Subscribe NCMD/DCMD before publishing births.
-	c.Subscribe(fmt.Sprintf("spBv1.0/%s/NCMD/%s", group, edge), 1, nil).WaitTimeout(2 * time.Second)
+	c.Subscribe(ncmdTopic, 1, nil).WaitTimeout(2 * time.Second)
 	c.Subscribe(fmt.Sprintf("spBv1.0/%s/DCMD/%s/%s", group, edge, device), 1, nil).WaitTimeout(2 * time.Second)
 
 	now := time.Now().UnixMilli()
-	seq := uint64(0)
 
 	// NBIRTH: bdSeq + Node Control/Rebirth (Boolean=false) + a generic metric.
 	c.Publish(fmt.Sprintf("spBv1.0/%s/NBIRTH/%s", group, edge), 0, false,
-		nbirthPayload(now, seq, bdSeq)).WaitTimeout(2 * time.Second)
-	seq++
+		nbirthPayload(now, 0, bdSeq)).WaitTimeout(2 * time.Second)
+	mu.Lock()
+	seq = 1
+	mu.Unlock()
 
 	// DBIRTH for the device.
 	c.Publish(fmt.Sprintf("spBv1.0/%s/DBIRTH/%s/%s", group, edge, device), 0, false,
-		dbirthPayload(now, seq)).WaitTimeout(2 * time.Second)
-	seq++
+		dbirthPayload(now, 1)).WaitTimeout(2 * time.Second)
+	mu.Lock()
+	seq = 2
+	mu.Unlock()
 
-	// One NDATA + DDATA so SendData-class IDs get a verdict.
-	c.Publish(fmt.Sprintf("spBv1.0/%s/NDATA/%s", group, edge), 0, false,
-		ndataPayload(time.Now().UnixMilli(), seq)).WaitTimeout(2 * time.Second)
-	seq++
-	c.Publish(fmt.Sprintf("spBv1.0/%s/DDATA/%s/%s", group, edge, device), 0, false,
-		ddataPayload(time.Now().UnixMilli(), seq)).WaitTimeout(2 * time.Second)
-	seq++
+	// Hold a beat for ReceiveCommandTest's NCMD/Rebirth to arrive — if it
+	// does, the rebirth handler runs inside this window. rebirth-action-1
+	// FAILs if any DATA is published between the NCMD and the responding
+	// NBIRTH, so DATA is gated on rebirthInFlight below.
+	time.Sleep(2 * time.Second)
 
-	// Allow the extension to process before clean tear-down.
-	time.Sleep(1 * time.Second)
+	publishWhenSafe := func(topic string, builder func(seq uint64) []byte) {
+		// Spin briefly while a rebirth response is mid-flight so we don't
+		// publish DATA between NCMD/Rebirth and the responding NBIRTH.
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) {
+			mu.Lock()
+			pending := rebirthInFlight
+			s := seq
+			if !pending {
+				seq++
+				mu.Unlock()
+				c.Publish(topic, 0, false, builder(s)).WaitTimeout(2 * time.Second)
+				return
+			}
+			mu.Unlock()
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
 
-	// DDEATH then NDEATH before clean DISCONNECT.
+	publishWhenSafe(fmt.Sprintf("spBv1.0/%s/NDATA/%s", group, edge),
+		func(s uint64) []byte { return ndataPayload(time.Now().UnixMilli(), s) })
+	publishWhenSafe(fmt.Sprintf("spBv1.0/%s/DDATA/%s/%s", group, edge, device),
+		func(s uint64) []byte { return ddataPayload(time.Now().UnixMilli(), s) })
+
+	// Hold the session open so any further test interactions (e.g. a
+	// second rebirth, command writes) can land. Sits under the 60s
+	// per-test timeout; tests that emit OVERALL early are not delayed —
+	// the orchestrator advances on OVERALL while this goroutine continues.
+	time.Sleep(15 * time.Second)
+
+	mu.Lock()
+	curSeq := seq
+	seq++
+	mu.Unlock()
 	c.Publish(fmt.Sprintf("spBv1.0/%s/DDEATH/%s/%s", group, edge, device), 0, false,
-		ddeathPayload(time.Now().UnixMilli(), seq)).WaitTimeout(2 * time.Second)
-	seq++
+		ddeathPayload(time.Now().UnixMilli(), curSeq)).WaitTimeout(2 * time.Second)
 	c.Publish(fmt.Sprintf("spBv1.0/%s/NDEATH/%s", group, edge), 0, false,
 		bdSeqPayload(bdSeq)).WaitTimeout(2 * time.Second)
+}
+
+// isRebirthCommand returns true if the protobuf payload contains a
+// "Node Control/Rebirth" metric set to Boolean=true.
+func isRebirthCommand(raw []byte) bool {
+	var p spbpb.Payload
+	if err := proto.Unmarshal(raw, &p); err != nil {
+		return false
+	}
+	for _, m := range p.GetMetrics() {
+		if m.GetName() != "Node Control/Rebirth" {
+			continue
+		}
+		if v, ok := m.Value.(*spbpb.Payload_Metric_BooleanValue); ok {
+			return v.BooleanValue
+		}
+	}
+	return false
 }
 
 // drivePrimaryHostEdge runs an edge node configured with a primary host
@@ -510,6 +615,7 @@ func drivePrimaryHostEdge(broker, hostID, group, edge, device string) {
 			SetCleanSession(true).
 			SetConnectTimeout(5 * time.Second).
 			SetBinaryWill(willTopic, bdSeqPayload(bdSeqVal), 1, false).
+			SetAutoReconnect(false).
 			SetDefaultPublishHandler(func(_ mqtt.Client, msg mqtt.Message) {
 				if msg.Topic() != stateTopic {
 					return
@@ -914,7 +1020,10 @@ func int32Value(v int32) metricValue {
 // --- payload builders ---
 
 func bdSeqPayload(seq uint64) []byte {
-	dt := uint32(spbpb.DataType_UInt64)
+	// Java TCK Monitor strictly checks bdSeq datatype == Int64 (per
+	// the spec text "datatype of INT64"). UInt64 trips its check even
+	// though both encode the same wire value.
+	dt := uint32(spbpb.DataType_Int64)
 	name := "bdSeq"
 	v := seq
 	p := &spbpb.Payload{Metrics: []*spbpb.Payload_Metric{{
@@ -928,7 +1037,7 @@ func bdSeqPayload(seq uint64) []byte {
 
 func nbirthPayload(ts int64, seq, bdSeq uint64) []byte {
 	tsU := uint64(ts)
-	bdSeqDT := uint32(spbpb.DataType_UInt64)
+	bdSeqDT := uint32(spbpb.DataType_Int64)
 	boolDT := uint32(spbpb.DataType_Boolean)
 	intDT := uint32(spbpb.DataType_Int32)
 	tmplDT := uint32(spbpb.DataType_Template)
