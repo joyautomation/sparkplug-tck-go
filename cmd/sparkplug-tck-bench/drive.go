@@ -11,10 +11,13 @@ import (
 	"github.com/joyautomation/sparkplug-tck-go/internal/spbpb"
 )
 
-// driveEdge replays a compliant Edge Node lifecycle: CONNECT with
-// NDEATH Will + bdSeq, subscribe NCMD/DCMD at QoS 1, publish NDEATH,
-// clean DISCONNECT. Used by the parity bench to populate the broker
-// without a real SUT.
+// driveEdge replays a spec-compliant Edge Node lifecycle: CONNECT with
+// NDEATH Will + bdSeq, subscribe NCMD/DCMD at QoS 1, publish NBIRTH
+// (bdSeq + Node Control/Rebirth + a sample metric) and per-device
+// DBIRTH, then NDATA + DDATA, then DDEATH and NDEATH before clean
+// DISCONNECT. Mirrors driveCompliantEdge in sparkplug-tck-correctness so
+// the per-ID verdicts in the bench JSON line up with what the upstream
+// Java TCK observes.
 func driveEdge(b *harness.Broker) {
 	c := mqtt.NewClient(mqtt.NewClientOptions().
 		AddBroker(b.URL()).
@@ -27,9 +30,110 @@ func driveEdge(b *harness.Broker) {
 	}
 	c.Subscribe("spBv1.0/G/NCMD/N", 1, nil).WaitTimeout(2 * time.Second)
 	c.Subscribe("spBv1.0/G/DCMD/N/D", 1, nil).WaitTimeout(2 * time.Second)
+
+	now := time.Now().UnixMilli()
+	seq := uint64(0)
+
+	c.Publish("spBv1.0/G/NBIRTH/N", 0, false, nbirthPayload(now, seq, 0)).WaitTimeout(2 * time.Second)
+	seq++
+	c.Publish("spBv1.0/G/DBIRTH/N/D", 0, false, dbirthPayload(now, seq)).WaitTimeout(2 * time.Second)
+	seq++
+	c.Publish("spBv1.0/G/NDATA/N", 0, false, ndataPayload(time.Now().UnixMilli(), seq)).WaitTimeout(2 * time.Second)
+	seq++
+	c.Publish("spBv1.0/G/DDATA/N/D", 0, false, ddataPayload(time.Now().UnixMilli(), seq)).WaitTimeout(2 * time.Second)
+	seq++
+	c.Publish("spBv1.0/G/DDEATH/N/D", 0, false, ddeathPayload(time.Now().UnixMilli(), seq)).WaitTimeout(2 * time.Second)
 	c.Publish("spBv1.0/G/NDEATH/N", 0, false, bdSeqPayload(0)).WaitTimeout(2 * time.Second)
 	c.Disconnect(200)
 	time.Sleep(100 * time.Millisecond)
+}
+
+func nbirthPayload(ts int64, seq, bdSeq uint64) []byte {
+	tsU := uint64(ts)
+	bdSeqDT := uint32(spbpb.DataType_UInt64)
+	boolDT := uint32(spbpb.DataType_Boolean)
+	intDT := uint32(spbpb.DataType_Int32)
+	bdSeqName := "bdSeq"
+	rebirthName := "Node Control/Rebirth"
+	hbName := "Heartbeat"
+	rebirthVal := false
+	hbVal := uint32(0)
+	bd := bdSeq
+	p := &spbpb.Payload{
+		Timestamp: &tsU,
+		Seq:       &seq,
+		Metrics: []*spbpb.Payload_Metric{
+			{Name: &bdSeqName, Datatype: &bdSeqDT, Timestamp: &tsU,
+				Value: &spbpb.Payload_Metric_LongValue{LongValue: bd}},
+			{Name: &rebirthName, Datatype: &boolDT, Timestamp: &tsU,
+				Value: &spbpb.Payload_Metric_BooleanValue{BooleanValue: rebirthVal}},
+			{Name: &hbName, Datatype: &intDT, Timestamp: &tsU,
+				Value: &spbpb.Payload_Metric_IntValue{IntValue: hbVal}},
+		},
+	}
+	raw, _ := proto.Marshal(p)
+	return raw
+}
+
+func dbirthPayload(ts int64, seq uint64) []byte {
+	tsU := uint64(ts)
+	intDT := uint32(spbpb.DataType_Int32)
+	name := "Counter"
+	v := uint32(0)
+	p := &spbpb.Payload{
+		Timestamp: &tsU,
+		Seq:       &seq,
+		Metrics: []*spbpb.Payload_Metric{
+			{Name: &name, Datatype: &intDT, Timestamp: &tsU,
+				Value: &spbpb.Payload_Metric_IntValue{IntValue: v}},
+		},
+	}
+	raw, _ := proto.Marshal(p)
+	return raw
+}
+
+func ndataPayload(ts int64, seq uint64) []byte {
+	tsU := uint64(ts)
+	intDT := uint32(spbpb.DataType_Int32)
+	name := "Heartbeat"
+	v := uint32(1)
+	p := &spbpb.Payload{
+		Timestamp: &tsU,
+		Seq:       &seq,
+		Metrics: []*spbpb.Payload_Metric{
+			{Name: &name, Datatype: &intDT, Timestamp: &tsU,
+				Value: &spbpb.Payload_Metric_IntValue{IntValue: v}},
+		},
+	}
+	raw, _ := proto.Marshal(p)
+	return raw
+}
+
+func ddataPayload(ts int64, seq uint64) []byte {
+	tsU := uint64(ts)
+	intDT := uint32(spbpb.DataType_Int32)
+	name := "Counter"
+	v := uint32(1)
+	p := &spbpb.Payload{
+		Timestamp: &tsU,
+		Seq:       &seq,
+		Metrics: []*spbpb.Payload_Metric{
+			{Name: &name, Datatype: &intDT, Timestamp: &tsU,
+				Value: &spbpb.Payload_Metric_IntValue{IntValue: v}},
+		},
+	}
+	raw, _ := proto.Marshal(p)
+	return raw
+}
+
+func ddeathPayload(ts int64, seq uint64) []byte {
+	tsU := uint64(ts)
+	p := &spbpb.Payload{
+		Timestamp: &tsU,
+		Seq:       &seq,
+	}
+	raw, _ := proto.Marshal(p)
+	return raw
 }
 
 // driveHost replays a compliant Host Application lifecycle: CONNECT

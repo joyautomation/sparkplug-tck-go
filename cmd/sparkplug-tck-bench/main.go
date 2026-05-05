@@ -40,6 +40,11 @@ type report struct {
 	Profiles     map[string]profilePerf    `json:"profile_perf"`
 	Wallclock    int64                     `json:"wallclock_us"`
 	Upstream     []upstreamTestParity      `json:"upstream_tests,omitempty"`
+	// HarnessVerdicts is the per-ID verdict the harness produced for the
+	// compliant synthetic SUT — fold of every scenario's results down to
+	// one status per ID (FAIL beats PASS beats N/A). Used by the
+	// correctness comparator to diff against the upstream Java TCK.
+	HarnessVerdicts map[string]string `json:"harness_verdicts,omitempty"`
 }
 
 // profilePerf is the per-profile perf breakdown the bench emits.
@@ -92,7 +97,7 @@ func main() {
 	}
 
 	wallStart := time.Now()
-	harnessIDs, profileTimes, profilePerfs, err := harnessCoverage()
+	harnessIDs, profileTimes, profilePerfs, harnessVerdicts, err := harnessCoverage()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "harness coverage: %v\n", err)
 		os.Exit(1)
@@ -127,6 +132,7 @@ func main() {
 		Profiles:     profilePerfs,
 		Wallclock:    wallclock.Microseconds(),
 		Upstream:     upstreamRows,
+		HarnessVerdicts: harnessVerdicts,
 	}
 
 	if *jsonOut {
@@ -141,15 +147,21 @@ func main() {
 // harnessCoverage runs each profile against a compliant synthetic SUT
 // driven through the in-process broker, collects the set of assertion
 // IDs the profile emits, and breaks the wallclock down by phase.
-func harnessCoverage() (map[string]bool, map[string]int, map[string]profilePerf, error) {
-	ids := map[string]bool{}
-	times := map[string]int{}
-	perfs := map[string]profilePerf{}
+//
+// verdicts is the per-ID rollup matching the upstream TCK's PASS/FAIL/
+// NOT_EXECUTED grammar — across all scenarios for one ID, FAIL beats
+// PASS beats NA. Used by the correctness comparator.
+func harnessCoverage() (ids map[string]bool, times map[string]int, perfs map[string]profilePerf, verdicts map[string]string, err error) {
+	ids = map[string]bool{}
+	times = map[string]int{}
+	perfs = map[string]profilePerf{}
+	verdicts = map[string]string{}
 	for name, p := range harness.Profiles {
 		bootStart := time.Now()
-		b, err := harness.NewBroker()
+		var b *harness.Broker
+		b, err = harness.NewBroker()
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		bootUS := time.Since(bootStart).Microseconds()
 
@@ -163,6 +175,9 @@ func harnessCoverage() (map[string]bool, map[string]int, map[string]profilePerf,
 
 		for _, r := range results {
 			ids[r.AssertionID] = true
+			cur := verdicts[r.AssertionID]
+			next := mapStatus(string(r.Status))
+			verdicts[r.AssertionID] = foldVerdict(cur, next)
 		}
 		times[name] = int(evalUS / 1000) // legacy ms field
 		perfs[name] = profilePerf{
@@ -176,7 +191,42 @@ func harnessCoverage() (map[string]bool, map[string]int, map[string]profilePerf,
 		}
 		_ = b.Close()
 	}
-	return ids, times, perfs, nil
+	return ids, times, perfs, verdicts, nil
+}
+
+// mapStatus translates internal runner.Status values to the upstream
+// TCK's PASS/FAIL/NOT_EXECUTED grammar so verdicts diff cleanly.
+func mapStatus(s string) string {
+	switch s {
+	case "pass":
+		return "PASS"
+	case "fail":
+		return "FAIL"
+	case "n/a":
+		return "NOT_EXECUTED"
+	}
+	return s
+}
+
+// foldVerdict combines two per-ID statuses for the same assertion. FAIL
+// dominates PASS dominates NOT_EXECUTED — same precedence the Java TCK
+// applies in Results.getSummary().
+func foldVerdict(a, b string) string {
+	rank := func(s string) int {
+		switch s {
+		case "FAIL":
+			return 3
+		case "PASS":
+			return 2
+		case "NOT_EXECUTED":
+			return 1
+		}
+		return 0
+	}
+	if rank(a) >= rank(b) {
+		return a
+	}
+	return b
 }
 
 // drive replays a known-good lifecycle for the named profile through the
@@ -294,7 +344,7 @@ func printMarkdown(w *os.File, r report) {
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "Total wallclock (broker boot + drive + eval, both profiles): **%d μs (%.1f ms)**\n\n",
 			r.Wallclock, float64(r.Wallclock)/1000.0)
-		fmt.Fprintln(w, "_Reference: the upstream Eclipse Sparkplug TCK requires HiveMQ + JVM warmup before a single SUT can connect. Typical cold-start is ~10s before the first assertion runs. This Go bench loads, drives a synthetic SUT, scores every scenario, and emits a parity report in a single binary launch._")
+		fmt.Fprintln(w, "_The upstream Eclipse Sparkplug TCK runs as a HiveMQ extension and waits for a real SUT to connect before assertions fire — see scripts/upstream-tck for the side-by-side correctness diff. This Go bench drives a synthetic SUT through an in-process broker and scores every scenario in a single binary launch._")
 		fmt.Fprintln(w)
 	}
 	if len(r.Upstream) > 0 {
