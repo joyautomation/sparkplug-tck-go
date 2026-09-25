@@ -704,7 +704,9 @@ func EdgeCleanSession(b *Broker) []runner.Result {
 // EdgeBirthMetricNaming evaluates the metric-naming rules across all
 // NBIRTH and DBIRTH payloads in the scenario:
 //   - aliases on every metric (the spec allows aliases, requires that
-//     when present in NBIRTH/DBIRTH the name+alias both appear)
+//     when present in NBIRTH/DBIRTH the name+alias both appear), except
+//     Node Control/Rebirth, which the spec requires to stay un-aliased
+//     in NBIRTH even when the edge uses aliases
 //   - alias uniqueness across the entire edge's NBIRTH+DBIRTH set
 //   - no two metric names collide when lower-cased
 func EdgeBirthMetricNaming(b *Broker) []runner.Result {
@@ -722,11 +724,14 @@ func EdgeBirthMetricNaming(b *Broker) []runner.Result {
 	aliasesByEdge := map[edgeKey][]aliasUse{}
 	allMetricsByEdge := map[edgeKey]map[string]string{} // lower -> original
 
+	type unaliasedUse struct {
+		key    edgeKey
+		metric string
+		topic  string
+	}
 	scored := false
 	var out []runner.Result
-	usesAliases := false
-	missingAliasMetric := ""
-	missingAliasSubj := ""
+	var unaliased []unaliasedUse
 	for _, e := range b.Events() {
 		if e.Type != EvPublish {
 			continue
@@ -748,11 +753,14 @@ func EdgeBirthMetricNaming(b *Broker) []runner.Result {
 		for _, m := range p.GetMetrics() {
 			name := m.GetName()
 			if m.Alias != nil {
-				usesAliases = true
 				aliasesByEdge[k] = append(aliasesByEdge[k], aliasUse{m.GetAlias(), name, e.Topic})
-			} else if usesAliases && name != "" && missingAliasMetric == "" {
-				missingAliasMetric = name
-				missingAliasSubj = e.Topic
+			} else if name != "" && !(name == "Node Control/Rebirth" && isNBIRTHTopic(e.Topic)) {
+				// Node Control/Rebirth is exempt: when aliases are in use
+				// the NBIRTH MUST NOT alias it
+				// [tck-id-operational-behavior-data-commands-rebirth-name-aliases],
+				// so its missing alias can't count against
+				// [tck-id-payloads-alias-birth-requirement].
+				unaliased = append(unaliased, unaliasedUse{k, name, e.Topic})
 			}
 			if name != "" {
 				lower := strings.ToLower(name)
@@ -761,6 +769,19 @@ func EdgeBirthMetricNaming(b *Broker) []runner.Result {
 				}
 				allMetricsByEdge[k][lower] = name
 			}
+		}
+	}
+	// Decide alias usage only after the full sweep: an un-aliased metric
+	// that appears before the edge's first aliased metric still violates
+	// the requirement.
+	usesAliases := len(aliasesByEdge) > 0
+	missingAliasMetric := ""
+	missingAliasSubj := ""
+	for _, u := range unaliased {
+		if len(aliasesByEdge[u.key]) > 0 {
+			missingAliasMetric = u.metric
+			missingAliasSubj = u.topic
+			break
 		}
 	}
 
