@@ -87,4 +87,5 @@ jobs:
             java.json
             go.json
             diff.json
-            .parity-per-test/*.hivemq.log
+            .parity-per-test/*.log
+            .parity-per-test/*.threads.txt
