@@ -50,6 +50,8 @@ for t in "${TESTS[@]}"; do
   bash scripts/upstream-tck/start-hivemq.sh
   "$CORRECTNESS_BIN" -tests "$t" > "$OUT_DIR/${slug}.json" || true
   bash scripts/upstream-tck/stop-hivemq.sh || true
+  # Keep each boot's broker log; start-hivemq.sh overwrites it.
+  cp scripts/upstream-tck/hivemq.out "$OUT_DIR/${slug}.hivemq.log" 2>/dev/null || true
   rm -rf "$HIVEMQ_DATA" || true
 done
 

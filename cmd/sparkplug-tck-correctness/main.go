@@ -335,12 +335,23 @@ func (c *collector) warmUp(budget time.Duration) error {
 func (c *collector) startTest(profile, name string, args []string) error {
 	parts := append([]string{"NEW_TEST", profile, name}, args...)
 	payload := strings.Join(parts, " ")
+	// The extension builds the test inside its publish interceptor, and
+	// every test's constructor does a blocking retained-store read
+	// (Utils.checkHostApplicationIsOnline), so the PUBACK waits on it.
+	// On a freshly booted HiveMQ that read can stall well past 10s even
+	// after the warm-up probe (which never touches the retained store)
+	// succeeds — give it room, and log how long it took.
+	const ackBudget = 45 * time.Second
+	start := time.Now()
 	tok := c.c.Publish(topicTestControl, 1, false, payload)
-	if !tok.WaitTimeout(10 * time.Second) {
-		return fmt.Errorf("publish NEW_TEST: timed out waiting for QoS1 ack after 10s")
+	if !tok.WaitTimeout(ackBudget) {
+		return fmt.Errorf("publish NEW_TEST: timed out waiting for QoS1 ack after %s", ackBudget)
 	}
 	if err := tok.Error(); err != nil {
 		return fmt.Errorf("publish NEW_TEST: %v", err)
+	}
+	if d := time.Since(start); d > 2*time.Second {
+		fmt.Fprintf(os.Stderr, "%s %s — NEW_TEST ack took %s\n", profile, name, d.Round(time.Millisecond))
 	}
 	time.Sleep(500 * time.Millisecond)
 	return nil
