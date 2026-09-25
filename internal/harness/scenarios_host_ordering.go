@@ -2,6 +2,7 @@ package harness
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/joyautomation/sparkplug-tck-go/internal/runner"
@@ -69,8 +70,10 @@ func HostMessageOrdering(b *Broker) []runner.Result {
 				}
 				continue
 			}
-			// Match same edge's NDATA/DDATA topic carrying the missing seq.
-			if (e.Topic == g.dataTopic || e.Topic == g.ndataTopic) && payloadSeq(e.Payload) == g.missing {
+			// The missing seq can arrive on any of the edge's seq-bearing
+			// topics — another device's DDATA, or a DBIRTH/DDEATH — not
+			// just the topic that arrived out of order.
+			if g.isEdgeSeqTopic(e.Topic) && payloadSeq(e.Payload)%256 == g.missing {
 				if recoveredAt.IsZero() {
 					recoveredAt = e.At
 				}
@@ -107,12 +110,27 @@ func HostMessageOrdering(b *Broker) []runner.Result {
 
 // seqGap describes a detected gap in an edge's NDATA/DDATA seq stream.
 type seqGap struct {
-	at         time.Time // time of the out-of-order publish
-	missing    uint64    // the seq number the host is waiting on
-	observed   uint64    // the seq number that arrived (out of order)
-	ncmdTopic  string    // spBv1.0/<group>/NCMD/<edge>
-	dataTopic  string    // edge's DDATA/<edge>/<dev> topic that gapped, or ""
-	ndataTopic string    // edge's NDATA/<edge> topic, or ""
+	at        time.Time // time of the out-of-order publish
+	missing   uint64    // the seq number the host is waiting on
+	observed  uint64    // the seq number that arrived (out of order)
+	ncmdTopic string    // spBv1.0/<group>/NCMD/<edge>
+	group     string
+	edge      string
+}
+
+// isEdgeSeqTopic reports whether t is a message from the gap's edge that
+// consumes a seq number after NBIRTH: DBIRTH, NDATA, DDATA or DDEATH.
+func (g seqGap) isEdgeSeqTopic(t string) bool {
+	var grp, edge string
+	switch {
+	case isNDATATopic(t):
+		grp, edge = topicParts2(t)
+	case isDDATATopic(t), isDBIRTHTopic(t), isDDEATHTopic(t):
+		grp, edge, _ = topicParts3(t)
+	default:
+		return false
+	}
+	return grp == g.group && edge == g.edge
 }
 
 // findSeqGaps walks NBIRTH/DBIRTH/NDATA/DDATA/DDEATH events grouped by
@@ -127,12 +145,19 @@ type seqGap struct {
 // because those are the ones a host could plausibly act on with a rebirth;
 // a DBIRTH out-of-order gap is rarer in practice and the assertions below
 // frame "host-reordering" in terms of NDATA/DDATA recovery.
+//
+// The tracker models a reordering host: seqs that arrive ahead of the one
+// it's waiting on are buffered, and a gap is recorded once per awaited seq,
+// never for a seq that has already arrived. So …6, 8, 7, 9… is one gap
+// (missing 7, filled), not three — a host that reorders correctly must not
+// be graded as if 8 went missing.
 func findSeqGaps(events []Event) []seqGap {
 	type key struct{ group, edge string }
 	type state struct {
-		next       uint64 // expected next seq
-		seen       bool
-		ndataTopic string
+		next    uint64    // seq the host is waiting on
+		started bool      // an NBIRTH (or first message) has set next
+		seen    [256]bool // seqs that arrived ahead of next, awaiting it
+		gapped  bool      // a gap has already been recorded for next
 	}
 	st := map[key]*state{}
 	var gaps []seqGap
@@ -141,23 +166,19 @@ func findSeqGaps(events []Event) []seqGap {
 			continue
 		}
 		t := e.Topic
-		var grp, edge, devData string
+		var grp, edge string
 		var isBirth, isData bool
 		switch {
 		case isNBIRTHTopic(t):
 			grp, edge = topicParts2(t)
 			isBirth = true
-		case isDBIRTHTopic(t):
-			grp, edge, devData = topicParts3(t)
-			_ = devData
-		case isDDEATHTopic(t):
-			grp, edge, devData = topicParts3(t)
-			_ = devData
+		case isDBIRTHTopic(t), isDDEATHTopic(t):
+			grp, edge, _ = topicParts3(t)
 		case isNDATATopic(t):
 			grp, edge = topicParts2(t)
 			isData = true
 		case isDDATATopic(t):
-			grp, edge, devData = topicParts3(t)
+			grp, edge, _ = topicParts3(t)
 			isData = true
 		default:
 			continue
@@ -165,35 +186,56 @@ func findSeqGaps(events []Event) []seqGap {
 		k := key{grp, edge}
 		s := st[k]
 		if s == nil {
-			s = &state{ndataTopic: "spBv1.0/" + grp + "/NDATA/" + edge}
+			s = &state{}
 			st[k] = s
 		}
-		seq := payloadSeq(e.Payload)
-		if isBirth {
-			// NBIRTH establishes seq=0; next expected is 1.
-			s.next = (seq + 1) % 256
-			s.seen = true
+		seq := payloadSeq(e.Payload) % 256
+		if isBirth || !s.started {
+			// NBIRTH establishes seq=0; next expected is 1. A stream we
+			// joined mid-flight starts from whatever arrived first.
+			*s = state{next: (seq + 1) % 256, started: true}
 			continue
 		}
-		if !s.seen {
-			s.next = (seq + 1) % 256
-			s.seen = true
-			continue
-		}
-		if seq != s.next && isData {
-			gap := seqGap{
-				at:         e.At,
-				missing:    s.next,
-				observed:   seq,
-				ncmdTopic:  "spBv1.0/" + grp + "/NCMD/" + edge,
-				ndataTopic: "spBv1.0/" + grp + "/NDATA/" + edge,
-				dataTopic:  t, // the topic that arrived out-of-order
+
+		// Forward distance from the seq the host is waiting on. Within
+		// half the ring it's ahead (the host must buffer it); otherwise
+		// it's a duplicate or a late copy of something already applied.
+		switch ahead := (seq + 256 - s.next) % 256; {
+		case ahead == 0:
+			// The awaited seq arrived: apply it and anything buffered
+			// behind it, the way a reordering host drains its buffer.
+			s.next = (s.next + 1) % 256
+			s.gapped = false
+			for s.seen[s.next] {
+				s.seen[s.next] = false
+				s.next = (s.next + 1) % 256
 			}
-			gaps = append(gaps, gap)
+			// Still holding buffered seqs means a further hole: the host
+			// is now waiting on the new next.
+			if slices.Contains(s.seen[:], true) {
+				gaps = append(gaps, newSeqGap(e.At, s.next, seq, grp, edge))
+				s.gapped = true
+			}
+		case ahead < 128:
+			s.seen[seq] = true
+			if isData && !s.gapped {
+				gaps = append(gaps, newSeqGap(e.At, s.next, seq, grp, edge))
+				s.gapped = true
+			}
 		}
-		s.next = (seq + 1) % 256
 	}
 	return gaps
+}
+
+func newSeqGap(at time.Time, missing, observed uint64, grp, edge string) seqGap {
+	return seqGap{
+		at:        at,
+		missing:   missing,
+		observed:  observed,
+		ncmdTopic: "spBv1.0/" + grp + "/NCMD/" + edge,
+		group:     grp,
+		edge:      edge,
+	}
 }
 
 func payloadSeq(raw []byte) uint64 {
