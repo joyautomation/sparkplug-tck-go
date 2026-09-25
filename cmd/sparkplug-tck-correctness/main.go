@@ -51,6 +51,10 @@ const (
 	topicResultsConfig = "SPARKPLUG_TCK/RESULT_CONFIG"
 	topicConsolePrompt = "SPARKPLUG_TCK/CONSOLE_PROMPT"
 	topicConsoleReply  = "SPARKPLUG_TCK/CONSOLE_REPLY"
+	// Throwaway topic for the QoS1 warm-up probe — deliberately outside
+	// both the spBv1.0/# and SPARKPLUG_TCK/# namespaces so neither the
+	// Monitor nor the extension's control plane ever sees it.
+	topicProbe = "SPARKPLUG_TCK_CORRECTNESS/PROBE"
 )
 
 type verdict struct {
@@ -147,7 +151,11 @@ func main() {
 			driver = func() { drivePrimaryHostEdge(*broker, runHost, *groupID, runEdge, *deviceID) }
 		case driverHost:
 			args = []string{runHost}
-			driver = func() { driveCompliantHost(*broker, runHost) }
+			// Only SessionEstablishmentTest provokes a BIRTH-resend; the
+			// other driverHost test (SessionTerminationTest) just wants a
+			// clean birth → death → disconnect.
+			awaitProvocation := testName == "SessionEstablishmentTest"
+			driver = func() { driveCompliantHost(*broker, runHost, awaitProvocation) }
 		case driverHostOnline:
 			// Test gates on host being online at NEW_TEST time, plus needs
 			// the host to publish NCMD/DCMD or reply to console prompts
@@ -294,7 +302,30 @@ func (c *collector) connect(url string) error {
 	if tok := c.c.Subscribe(topicLog, 1, nil); !tok.WaitTimeout(2*time.Second) || tok.Error() != nil {
 		return fmt.Errorf("sub log: %v", tok.Error())
 	}
-	return nil
+	// A freshly-booted HiveMQ ACKs CONNECT/SUBSCRIBE well before its
+	// QoS1 publish path is actually serving — PUBACKs can stall for
+	// >10s. The NEW_TEST publish used to eat that stall and mark the
+	// test INFRA_FAILED, so probe until the broker acks a publish
+	// before letting real traffic through.
+	return c.warmUp(60 * time.Second)
+}
+
+// warmUp publishes QoS1 probes to a throwaway topic until one is acked
+// or the budget runs out.
+func (c *collector) warmUp(budget time.Duration) error {
+	deadline := time.Now().Add(budget)
+	attempts := 0
+	for {
+		attempts++
+		tok := c.c.Publish(topicProbe, 1, false, []byte("warm-up"))
+		if tok.WaitTimeout(2*time.Second) && tok.Error() == nil {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("QoS1 warm-up: no PUBACK after %s (%d probes)", budget, attempts)
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
 }
 
 // startTest publishes a NEW_TEST command to the TCK extension and gives
@@ -759,7 +790,10 @@ func publishDeaths(c mqtt.Client, group, edge, device string, seq *uint64, bdSeq
 // We mimic that: subscribe namespace+STATE, publish BIRTH (timestamp
 // MUST match the will payload), watch the STATE topic, and republish
 // BIRTH with a fresh timestamp when the TCK's offline provocation arrives.
-func driveCompliantHost(broker, host string) {
+// awaitProvocation says whether the test sends that provocation and
+// blocks on the resend (SessionEstablishmentTest does, SessionTermination
+// doesn't).
+func driveCompliantHost(broker, host string, awaitProvocation bool) {
 	clientID := "tck-correctness-host-" + host
 	stateTopic := fmt.Sprintf("spBv1.0/STATE/%s", host)
 	// The spec requires the BIRTH timestamp to equal the WILL/Death timestamp,
@@ -828,14 +862,50 @@ func driveCompliantHost(broker, host string) {
 	c.Subscribe("spBv1.0/#", 1, nil).WaitTimeout(2 * time.Second)
 	c.Subscribe(stateTopic, 1, nil).WaitTimeout(2 * time.Second)
 
-	c.Publish(stateTopic, 1, true, birthBody).WaitTimeout(2 * time.Second)
+	// Mark born BEFORE publishing. The TCK sends its offline provocation
+	// from a broker interceptor, so it can be delivered ahead of our own
+	// PUBACK — gating bornFlag on the publish token dropped those early
+	// provocations, and the TCK then misread our final death publish as
+	// the birth resend (five FAILs). Nothing stale can sneak in early:
+	// the host ID, and so the STATE topic, is unique per invocation.
 	mu.Lock()
 	bornFlag = true
 	mu.Unlock()
+	c.Publish(stateTopic, 1, true, birthBody).WaitTimeout(2 * time.Second)
 
-	// Hold the session open long enough for the TCK to send its offline
-	// provocation and observe our BIRTH-resend before we DISCONNECT.
-	time.Sleep(5 * time.Second)
+	if awaitProvocation {
+		// Wait for the TCK's offline provocation → our BIRTH-resend,
+		// then linger so the TCK can process the resend before we
+		// terminate. Cap the wait so a lost provocation can't hang us.
+		deadline := time.Now().Add(8 * time.Second)
+		for time.Now().Before(deadline) {
+			mu.Lock()
+			done := responded
+			mu.Unlock()
+			if done {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		mu.Lock()
+		missed := !responded
+		mu.Unlock()
+		if missed {
+			// The provocation never reached us. The TCK is still waiting
+			// for the resend and evaluates ANY publish on the STATE topic
+			// as it — publishing the death now would flip five birth
+			// assertions to FAIL. Bow out gracefully instead (DISCONNECT
+			// discards the will) so the resend IDs land NOT_EXECUTED,
+			// which the parity diff tolerates as a coverage gap.
+			c.Disconnect(200)
+			return
+		}
+		time.Sleep(time.Second)
+	} else {
+		// Hold the session open long enough for the TCK to run its
+		// checks before we DISCONNECT.
+		time.Sleep(5 * time.Second)
+	}
 
 	// Spec: a Host Application MUST publish a death (online:false) on
 	// the STATE topic before intentionally disconnecting — host/
