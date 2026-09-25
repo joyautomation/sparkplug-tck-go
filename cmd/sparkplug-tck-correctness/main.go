@@ -135,9 +135,13 @@ func main() {
 		// Use unique edge/host IDs per run so the TCK extension never
 		// thinks "this SUT was already seen this session" — the second
 		// run after that diagnosis would otherwise time out. Suffix is
-		// per-invocation to avoid stale state across sweeps.
-		runEdge := fmt.Sprintf("%s%s-%d", *edgeID, runSuffix, i)
-		runHost := fmt.Sprintf("%s%s-%d", *hostID, runSuffix, i)
+		// per-invocation to avoid stale state across sweeps. The IDs
+		// are also chosen so the TCK's helper clients never share the
+		// collector's HiveMQ executor bucket (see bucket.go).
+		runHost, runEdge, err := pickRunIDs(ctrl.clientID, *hostID, *groupID, *edgeID, runSuffix, i)
+		if err != nil {
+			fail("test %d: %v", i, err)
+		}
 
 		var args []string
 		var driver func()
@@ -267,6 +271,7 @@ func driverKindFor(profile, testName string) driverKind {
 // for the OVERALL marker that signals end-of-test.
 type collector struct {
 	c        mqtt.Client
+	clientID string
 	mu       sync.Mutex
 	verdicts []verdict
 	overall  string
@@ -278,12 +283,13 @@ func newCollector() *collector {
 }
 
 func (c *collector) connect(url string) error {
+	c.clientID = fmt.Sprintf("sparkplug-tck-correctness-%d", time.Now().UnixNano())
 	// Route via DefaultPublishHandler — paho's per-subscription callbacks
 	// get bypassed in a way we couldn't pin down on this broker, so the
 	// safe path is one global handler that dispatches by topic.
 	opts := mqtt.NewClientOptions().
 		AddBroker(url).
-		SetClientID(fmt.Sprintf("sparkplug-tck-correctness-%d", time.Now().UnixNano())).
+		SetClientID(c.clientID).
 		SetCleanSession(true).
 		SetConnectTimeout(5 * time.Second).
 		SetDefaultPublishHandler(func(cli mqtt.Client, msg mqtt.Message) {
@@ -335,12 +341,10 @@ func (c *collector) warmUp(budget time.Duration) error {
 func (c *collector) startTest(profile, name string, args []string) error {
 	parts := append([]string{"NEW_TEST", profile, name}, args...)
 	payload := strings.Join(parts, " ")
-	// The extension builds the test inside its publish interceptor, and
-	// every test's constructor does a blocking retained-store read
-	// (Utils.checkHostApplicationIsOnline), so the PUBACK waits on it.
-	// On a freshly booted HiveMQ that read can stall well past 10s even
-	// after the warm-up probe (which never touches the retained store)
-	// succeeds — give it room, and log how long it took.
+	// The extension builds the test inside its publish interceptor, so
+	// the PUBACK waits on the test's constructor — which may connect a
+	// helper client. pickRunIDs keeps that from deadlocking; the budget
+	// and latency log are there so a new kind of stall shows up clearly.
 	const ackBudget = 45 * time.Second
 	start := time.Now()
 	tok := c.c.Publish(topicTestControl, 1, false, payload)
