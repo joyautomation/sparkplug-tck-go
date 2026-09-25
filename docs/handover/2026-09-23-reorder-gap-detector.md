@@ -1,5 +1,10 @@
 # `findSeqGaps` fails a host that reordered correctly
 
+> **Resolved** in #9 (merged 2026-09-25). `findSeqGaps` now buffers seqs that arrive ahead of the awaited one
+> (`d1899fc`), with the table test below in `internal/harness/scenarios_host_ordering_test.go`. The same commit
+> widens recovery matching to any of the edge's DBIRTH/NDATA/DDATA/DDEATH topics. Confirmed end to end in the
+> `ignition` repo: with the simulator's swap restored, Mantle passes all four `host-reordering-*` assertions.
+
 Found 2026-09-23 while grading Mantle (the Ignition Sparkplug host module) against the host-application
 profile. **The kit reported a conformance failure against a host that behaved exactly to spec.**
 
