@@ -1,5 +1,10 @@
 # sparkplug-tck-go
 
+[![CI](https://github.com/joyautomation/sparkplug-tck-go/actions/workflows/ci.yml/badge.svg)](https://github.com/joyautomation/sparkplug-tck-go/actions/workflows/ci.yml)
+[![Parity](https://github.com/joyautomation/sparkplug-tck-go/actions/workflows/parity.yml/badge.svg)](https://github.com/joyautomation/sparkplug-tck-go/actions/workflows/parity.yml)
+[![Spec drift](https://github.com/joyautomation/sparkplug-tck-go/actions/workflows/spec-drift.yml/badge.svg)](https://github.com/joyautomation/sparkplug-tck-go/actions/workflows/spec-drift.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 A Go reimplementation of the [Eclipse Sparkplug Test Compatibility Kit](https://github.com/eclipse-sparkplug/sparkplug/tree/master/tck) — every conformance check the upstream Java TCK runs, plus a passive mode that runs against any deployment, in a single static binary with no JVM.
 
 ## Why we built this
